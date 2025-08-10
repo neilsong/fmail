@@ -49,9 +49,9 @@ export const EmailActions = ({
     workflowService.initialize("user123");
   }, []);
 
-  const trackAction = (action: string) => {
+  const trackAction = (action: UserAction["action"]) => {
     workflowService.trackAction({
-      action: action as UserAction["action"],
+      action,
       email: {
         id: String(email.id),
         sender: email.from,
@@ -175,7 +175,7 @@ export const EmailActions = ({
       [EmailLocation.sent]: "sent",
       [EmailLocation.snoozed]: "snoozed",
     };
-    trackAction(`move_to_${locationNames[location]}`);
+    trackAction(`move_to_${locationNames[location]}` as UserAction["action"]);
     const previousLocation = email.location;
     moveEmail(email.id, location);
     const toastId = toast.add({
@@ -184,7 +184,7 @@ export const EmailActions = ({
       actionProps: {
         children: "Undo",
         onClick: () => {
-          trackAction(`undo_move_to_${locationNames[location]}`);
+          trackAction(`undo_move_to_${locationNames[location]}` as UserAction["action"]);
           moveEmail(email.id, previousLocation);
           toast.close(toastId);
         },

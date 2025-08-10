@@ -1,15 +1,5 @@
 import { Paperclip } from "lucide-react";
-
-export interface Email {
-  id: number;
-  from: string;
-  email: string;
-  subject: string;
-  preview: string;
-  time: string;
-  unread: boolean;
-  hasAttachment: boolean;
-}
+import type { Email } from "@/store/email.schema";
 
 interface EmailListItemProps {
   email: Email;

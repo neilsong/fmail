@@ -11,10 +11,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+import { workflowService, type UserAction } from "@/services/WorkflowService";
 import type { Email } from "@/store/email.schema";
 import { EmailLocation, EmailTag } from "@/store/email.schema";
 import { useEmailStore } from "@/store/useEmailStore";
-import { workflowService } from "@/services/WorkflowService";
 import {
   ArchiveX,
   Clock,
@@ -34,27 +34,33 @@ interface EmailActionsProps {
   onActionComplete?: () => void;
 }
 
-export const EmailActions = ({ email, variant = "full", context = "home", onActionComplete }: EmailActionsProps) => {
+export const EmailActions = ({
+  email,
+  variant = "full",
+  context = "home",
+  onActionComplete,
+}: EmailActionsProps) => {
   const toast = useToast();
-  const { moveEmail, toggleTag, markAsRead, deleteEmail } = useEmailStore();
-  
+  const { moveEmail, toggleTag, markAsRead, deleteEmail, toggleStarred } =
+    useEmailStore();
+
   useEffect(() => {
     // Initialize the singleton workflow service
     workflowService.initialize("user123");
   }, []);
-  
+
   const trackAction = (action: string) => {
     workflowService.trackAction({
-      action: action as any,
+      action: action as UserAction["action"],
       email: {
         id: String(email.id),
         sender: email.from,
         subject: email.subject,
-        labels: (email.tags || []).map(tag => String(tag))
+        labels: (email.tags || []).map((tag) => String(tag)),
       },
       context: {
-        location: context
-      }
+        location: context,
+      },
     });
   };
 
@@ -122,7 +128,7 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
     e.stopPropagation();
     const isStarred = email.starred;
     trackAction(isStarred ? "unstar" : "star");
-    toggleTag(email.id, EmailTag.starred);
+    toggleStarred(email.id);
     const toastId = toast.add({
       title: isStarred ? "Star removed" : "Email starred",
       description: isStarred
@@ -132,7 +138,7 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
         children: "Undo",
         onClick: () => {
           trackAction(isStarred ? "undo_unstar" : "undo_star");
-          toggleTag(email.id, EmailTag.starred);
+          toggleStarred(email.id);
           toast.close(toastId);
         },
       },
@@ -190,10 +196,10 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
   const handleToggleTag = (tag: EmailTag, e: React.MouseEvent) => {
     e.stopPropagation();
     const hasTag = email.tags.includes(tag);
-    
+
     // Track label assignment/removal action
     trackAction(hasTag ? "remove_label" : "add_label");
-    
+
     toggleTag(email.id, tag);
     const tagNames = {
       [EmailTag.important]: "Important",
@@ -343,7 +349,9 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
               </DropdownMenuItem>
             )}
             <DropdownMenuItem onClick={handleStar}>
-              <StarIcon className={`size-4 mr-2 ${isStarred ? "fill-yellow-400 text-yellow-400" : ""}`} />
+              <StarIcon
+                className={`size-4 mr-2 ${isStarred ? "fill-yellow-400 text-yellow-400" : ""}`}
+              />
               {isStarred ? "Unstar" : "Star"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={(e) => e.stopPropagation()}>

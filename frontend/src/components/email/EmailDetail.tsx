@@ -4,12 +4,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
+import { workflowService } from "@/services/WorkflowService";
 import type { Email } from "@/store/email.schema";
 import { useEmailStore } from "@/store/useEmailStore";
 import { ArrowLeftIcon } from "lucide-react";
 import { useEffect } from "react";
 import { EmailActions } from "./EmailActions";
-import { workflowService } from "@/services/WorkflowService";
 
 interface EmailDetailProps {
   email: Email;
@@ -31,54 +31,39 @@ export const EmailDetail = ({ email, onBack }: EmailDetailProps) => {
     },
   });
 
-  // Also mark as read if email changes while component is mounted
-  useEffect(() => {
-    if (email.unread) {
-      // Give a small delay to ensure the email is actually being viewed
-      const timer = setTimeout(() => {
-        if (email.unread) {
-          markAsRead(email.id, true);
-        }
-      }, 500);
-
-      return () => clearTimeout(timer);
-    }
-  }, [email.id, email.unread, markAsRead]);
-  
-  // Workflow tracking - separate useEffect
+  // Track email open on mount and close on unmount
   useEffect(() => {
     // Initialize the singleton workflow service
     workflowService.initialize("user123");
-    
-    // Track email open
+
+    // Track email open when component mounts
     workflowService.trackAction({
       action: "open",
       email: {
         id: String(email.id),
         sender: email.from,
         subject: email.subject,
-        labels: (email.tags || []).map(tag => String(tag))
+        labels: (email.tags || []).map((tag) => String(tag)),
       },
       context: {
-        location: "detail"
-      }
+        location: "detail",
+      },
     });
-    
+
     return () => {
-      // Track email close
+      // Track email close when component unmounts
       workflowService.trackAction({
         action: "close",
         email: {
           id: String(email.id),
           sender: email.from,
           subject: email.subject,
-          labels: (email.tags || []).map(tag => String(tag))
+          labels: (email.tags || []).map((tag) => String(tag)),
         },
         context: {
-          location: "detail"
-        }
+          location: "detail",
+        },
       });
-      // Note: We don't disconnect here since it's a singleton
     };
   }, [email]);
 

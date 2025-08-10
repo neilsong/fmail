@@ -1,5 +1,5 @@
-import { WorkflowTracker } from '@/WorkflowTracker';
-import type { WorkflowSuggestion, UserAction } from '@/WorkflowTracker';
+import type { UserAction, WorkflowSuggestion } from "@/WorkflowTracker";
+import { WorkflowTracker } from "@/WorkflowTracker";
 
 /**
  * Singleton service for managing a single WorkflowTracker instance
@@ -47,9 +47,9 @@ class WorkflowService {
   /**
    * Track a user action using the singleton tracker
    */
-  trackAction(action: Omit<UserAction, 'timestamp' | 'user_id' | 'session_id'>): void {
+  trackAction(action: Omit<UserAction, "timestamp" | "user_id" | "session_id">): void {
     if (!this.tracker) {
-      console.warn('WorkflowService not initialized. Call initialize(userId) first.');
+      console.warn("WorkflowService not initialized. Call initialize(userId) first.");
       return;
     }
 
@@ -61,7 +61,7 @@ class WorkflowService {
    */
   onSuggestion(callback: (suggestion: WorkflowSuggestion) => void): void {
     if (!this.tracker) {
-      console.warn('WorkflowService not initialized. Call initialize(userId) first.');
+      console.warn("WorkflowService not initialized. Call initialize(userId) first.");
       return;
     }
 
@@ -73,7 +73,7 @@ class WorkflowService {
    */
   onConfirmation(callback: (message: string) => void): void {
     if (!this.tracker) {
-      console.warn('WorkflowService not initialized. Call initialize(userId) first.');
+      console.warn("WorkflowService not initialized. Call initialize(userId) first.");
       return;
     }
 
@@ -85,7 +85,7 @@ class WorkflowService {
    */
   respondToSuggestion(suggestionId: string, accepted: boolean): void {
     if (!this.tracker) {
-      console.warn('WorkflowService not initialized. Call initialize(userId) first.');
+      console.warn("WorkflowService not initialized. Call initialize(userId) first.");
       return;
     }
 
@@ -114,7 +114,7 @@ class WorkflowService {
       this.tracker.disconnect();
       this.tracker = null;
       this.userId = null;
-      console.log('WorkflowService disconnected');
+      console.log("WorkflowService disconnected");
     }
   }
 }
@@ -123,4 +123,4 @@ class WorkflowService {
 export const workflowService = WorkflowService.getInstance();
 
 // Export types for convenience
-export type { WorkflowSuggestion, UserAction } from '@/WorkflowTracker';
+export type { UserAction, WorkflowSuggestion } from "@/WorkflowTracker";

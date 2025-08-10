@@ -1,4 +1,5 @@
 import { mockEmails } from "@/data/emails";
+import { workflowService } from "@/services/WorkflowService";
 import type { Email, EmailLocation, EmailTag } from "@/store/email.schema";
 import { EmailLocation as EL } from "@/store/email.schema";
 import { create } from "zustand";
@@ -158,15 +159,39 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     })),
 
   markAsRead: (emailId, read) =>
-    set((state) => ({
-      emails: state.emails.map((email) =>
-        email.id === emailId ? { ...email, unread: !read } : email
-      ),
-      selectedEmail:
-        state.selectedEmail?.id === emailId
-          ? { ...state.selectedEmail, unread: !read }
-          : state.selectedEmail,
-    })),
+    set((state) => {
+      // Find the email to track the action
+      const email = state.emails.find((e) => e.id === emailId);
+      
+      if (email && read && email.unread) {
+        // Initialize workflow service if needed
+        workflowService.initialize("user123");
+        
+        // Track mark_read action
+        workflowService.trackAction({
+          action: "mark_read",
+          email: {
+            id: String(email.id),
+            sender: email.from,
+            subject: email.subject,
+            labels: (email.tags || []).map(tag => String(tag))
+          },
+          context: {
+            location: "detail"
+          }
+        });
+      }
+      
+      return {
+        emails: state.emails.map((email) =>
+          email.id === emailId ? { ...email, unread: !read } : email
+        ),
+        selectedEmail:
+          state.selectedEmail?.id === emailId
+            ? { ...state.selectedEmail, unread: !read }
+            : state.selectedEmail,
+      };
+    }),
 
   deleteEmail: (emailId) =>
     set((state) => ({

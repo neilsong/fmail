@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Email } from "@/store/email.schema";
 import { EmailLocation, EmailTag } from "@/store/email.schema";
 import { useEmailStore } from "@/store/useEmailStore";
+import { workflowService } from "@/services/WorkflowService";
 import {
   ArchiveX,
   Clock,
@@ -24,23 +25,42 @@ import {
   StarIcon,
   Trash2,
 } from "lucide-react";
+import { useEffect } from "react";
 
 interface EmailActionsProps {
   email: Email;
   variant?: "full" | "compact";
+  context?: "home" | "detail"; // Track where the action is taken
   onActionComplete?: () => void;
 }
 
-export const EmailActions = ({
-  email,
-  variant = "full",
-  onActionComplete,
-}: EmailActionsProps) => {
+export const EmailActions = ({ email, variant = "full", context = "home", onActionComplete }: EmailActionsProps) => {
   const toast = useToast();
-  const { moveEmail, toggleTag, markAsRead, deleteEmail, toggleStarred } = useEmailStore();
+  const { moveEmail, toggleTag, markAsRead, deleteEmail } = useEmailStore();
+  
+  useEffect(() => {
+    // Initialize the singleton workflow service
+    workflowService.initialize("user123");
+  }, []);
+  
+  const trackAction = (action: string) => {
+    workflowService.trackAction({
+      action: action as any,
+      email: {
+        id: String(email.id),
+        sender: email.from,
+        subject: email.subject,
+        labels: (email.tags || []).map(tag => String(tag))
+      },
+      context: {
+        location: context
+      }
+    });
+  };
 
   const handleArchive = (e: React.MouseEvent) => {
     e.stopPropagation();
+    trackAction("archive");
     const previousLocation = email.location;
     moveEmail(email.id, EmailLocation.archive);
     const toastId = toast.add({
@@ -77,6 +97,7 @@ export const EmailActions = ({
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
+    trackAction("delete");
     const previousLocation = email.location;
     deleteEmail(email.id);
     const toastId = toast.add({
@@ -95,8 +116,9 @@ export const EmailActions = ({
 
   const handleStar = (e: React.MouseEvent) => {
     e.stopPropagation();
+    trackAction("star");
     const isStarred = email.starred;
-    toggleStarred(email.id);
+    toggleTag(email.id, EmailTag.starred);
     const toastId = toast.add({
       title: isStarred ? "Star removed" : "Email starred",
       description: isStarred
@@ -105,7 +127,7 @@ export const EmailActions = ({
       actionProps: {
         children: "Undo",
         onClick: () => {
-          toggleStarred(email.id);
+          toggleTag(email.id, EmailTag.starred);
           toast.close(toastId);
         },
       },

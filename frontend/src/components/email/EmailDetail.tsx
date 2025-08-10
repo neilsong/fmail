@@ -10,6 +10,7 @@ import { useEmailStore } from "@/store/useEmailStore";
 import { ArrowLeftIcon } from "lucide-react";
 import { useEffect } from "react";
 import { EmailActions } from "./EmailActions";
+import { workflowService } from "@/services/WorkflowService";
 
 interface EmailDetailProps {
   email: Email;
@@ -44,6 +45,43 @@ export const EmailDetail = ({ email, onBack }: EmailDetailProps) => {
       return () => clearTimeout(timer);
     }
   }, [email.id, email.unread, markAsRead]);
+  
+  // Workflow tracking - separate useEffect
+  useEffect(() => {
+    // Initialize the singleton workflow service
+    workflowService.initialize("user123");
+    
+    // Track email open
+    workflowService.trackAction({
+      action: "open",
+      email: {
+        id: String(email.id),
+        sender: email.from,
+        subject: email.subject,
+        labels: (email.tags || []).map(tag => String(tag))
+      },
+      context: {
+        location: "detail"
+      }
+    });
+    
+    return () => {
+      // Track email close
+      workflowService.trackAction({
+        action: "close",
+        email: {
+          id: String(email.id),
+          sender: email.from,
+          subject: email.subject,
+          labels: (email.tags || []).map(tag => String(tag))
+        },
+        context: {
+          location: "detail"
+        }
+      });
+      // Note: We don't disconnect here since it's a singleton
+    };
+  }, [email]);
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -59,7 +97,7 @@ export const EmailDetail = ({ email, onBack }: EmailDetailProps) => {
               <TooltipContent>Back to inbox</TooltipContent>
             </Tooltip>
             <Separator orientation="vertical" className="mx-1 h-4" />
-            <EmailActions email={email} variant="full" />
+            <EmailActions email={email} variant="full" context="detail" />
           </div>
         </div>
       </header>

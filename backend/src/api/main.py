@@ -127,7 +127,9 @@ async def get_user(user_id: int):
 
 # Include LLM-powered email endpoint router
 from .llm_api import router as llm_router  # noqa: E402
+from .workflow_api import router as workflow_router  # noqa: E402
 app.include_router(llm_router)
+app.include_router(workflow_router)
 
 # Statistics endpoint
 @app.get("/api/stats")

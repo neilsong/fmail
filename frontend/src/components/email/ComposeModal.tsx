@@ -37,6 +37,15 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
     // If this was an AI-generated email, analyze the diffs for learning
     if (isAIMode && generatedContent && generatedEmailId) {
       try {
+        // First, get the stored original generated content
+        const storedResponse = await fetch(`http://localhost:8000/api/stored-email/${generatedEmailId}`);
+        let originalGeneratedContent = generatedContent; // fallback to current state
+        
+        if (storedResponse.ok) {
+          const storedData = await storedResponse.json();
+          originalGeneratedContent = storedData.generated_content;
+        }
+        
         await fetch('http://localhost:8000/api/analyze-email-diff', {
           method: 'POST',
           headers: {
@@ -45,10 +54,7 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
           body: JSON.stringify({
             email_id: generatedEmailId,
             recipient: to || "team",
-            generated_content: {
-              subject: generatedContent.subject,
-              body: generatedContent.body
-            },
+            generated_content: originalGeneratedContent,
             final_content: {
               subject: isAIMode && generatedContent ? generatedContent.subject : subject,
               body: isAIMode && generatedContent ? generatedContent.body : body
@@ -133,10 +139,6 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
               email_id: emailId,
               recipient: to || "team",
               generated_content: {
-                subject: data.subject,
-                body: data.body
-              },
-              final_content: {
                 subject: data.subject,
                 body: data.body
               }

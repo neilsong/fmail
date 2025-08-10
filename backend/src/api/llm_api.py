@@ -22,48 +22,58 @@ def store_generated_email(email_id: str, generated_content: Dict[str, Any]):
         "timestamp": datetime.now().isoformat()
     }
 
-def analyze_email_diffs(recipient: str, generated_content: Dict[str, Any], final_content: Dict[str, Any]) -> Dict[str, Any]:
-    """Analyze differences between generated and final email content"""
+async def analyze_email_diffs(recipient: str, generated_content: Dict[str, Any], final_content: Dict[str, Any]) -> Dict[str, Any]:
+    """Analyze differences between generated and final email content using LLM"""
     recipient_hash = get_recipient_hash(recipient)
     
-    # Simple diff analysis (in production, you'd use a more sophisticated LLM call)
+    # Use LLM to analyze differences
+    try:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key and OpenAI is not None:
+            client = OpenAI(api_key=api_key)
+            
+            system_prompt = """You are an expert at analyzing email writing preferences. 
+            Compare the original AI-generated email with the user's final edited version.
+            Identify the key differences and return a concise analysis of the user's writing preferences.
+            Focus on style, tone, structure, and formatting preferences.
+            Return your analysis as a simple string, not JSON."""
+            
+            user_prompt = f"""Please analyze the differences between these two emails and identify the user's writing preferences:
+
+ORIGINAL AI-GENERATED EMAIL:
+Subject: {generated_content.get('subject', '')}
+Body: {generated_content.get('body', '')}
+
+USER'S FINAL EDITED EMAIL:
+Subject: {final_content.get('subject', '')}
+Body: {final_content.get('body', '')}
+
+What are the key differences that reveal this user's writing preferences? Focus on style, tone, structure, and formatting."""
+
+            completion = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
+                max_tokens=200
+            )
+            
+            llm_analysis = completion.choices[0].message.content
+        else:
+            # Fallback to simple analysis if LLM not available
+            llm_analysis = "LLM analysis not available - using fallback"
+    except Exception as e:
+        print(f"LLM analysis failed: {e}")
+        llm_analysis = "LLM analysis failed - using fallback"
+    
     diff_analysis = {
         "recipient": recipient,
         "timestamp": datetime.now().isoformat(),
-        "changes": {},
+        "llm_analysis": llm_analysis,
         "preferences": []
     }
-    
-    # Analyze subject changes
-    if generated_content.get("subject") != final_content.get("subject"):
-        diff_analysis["changes"]["subject"] = {
-            "from": generated_content.get("subject"),
-            "to": final_content.get("subject")
-        }
-    
-    # Analyze body changes
-    generated_body = generated_content.get("body", "")
-    final_body = final_content.get("body", "")
-    
-    if generated_body != final_body:
-        # Simple text analysis
-        generated_words = len(generated_body.split())
-        final_words = len(final_body.split())
-        
-        if final_words > generated_words * 1.5:
-            diff_analysis["preferences"].append("Prefers longer, more detailed emails")
-        elif final_words < generated_words * 0.7:
-            diff_analysis["preferences"].append("Prefers concise, brief emails")
-        
-        # Check for formal language patterns
-        if any(word in final_body.lower() for word in ["sincerely", "respectfully", "best regards"]):
-            diff_analysis["preferences"].append("Prefers formal closing")
-        
-        # Check for bullet points
-        if "- " in final_body or "• " in final_body:
-            diff_analysis["preferences"].append("Prefers bullet points in emails")
-        else:
-            diff_analysis["preferences"].append("Prefers paragraph format over bullet points")
     
     # Store the analysis
     if recipient_hash not in email_diffs_store:
@@ -75,9 +85,21 @@ def analyze_email_diffs(recipient: str, generated_content: Dict[str, Any], final
     
     email_diffs_store[recipient_hash]["analyses"].append(diff_analysis)
     
-    # Update preferences
-    for pref in diff_analysis["preferences"]:
-        email_diffs_store[recipient_hash]["preferences"].add(pref)
+    # Extract key preferences from LLM analysis for future use
+    if "bullet points" in llm_analysis.lower():
+        email_diffs_store[recipient_hash]["preferences"].add("Prefers bullet points")
+    elif "paragraph" in llm_analysis.lower():
+        email_diffs_store[recipient_hash]["preferences"].add("Prefers paragraph format")
+    
+    if "formal" in llm_analysis.lower():
+        email_diffs_store[recipient_hash]["preferences"].add("Prefers formal tone")
+    elif "casual" in llm_analysis.lower():
+        email_diffs_store[recipient_hash]["preferences"].add("Prefers casual tone")
+    
+    if "concise" in llm_analysis.lower() or "brief" in llm_analysis.lower():
+        email_diffs_store[recipient_hash]["preferences"].add("Prefers concise emails")
+    elif "detailed" in llm_analysis.lower() or "verbose" in llm_analysis.lower():
+        email_diffs_store[recipient_hash]["preferences"].add("Prefers detailed emails")
     
     return diff_analysis
 
@@ -85,7 +107,15 @@ def get_user_preferences(recipient: str) -> List[str]:
     """Get learned preferences for a specific recipient"""
     recipient_hash = get_recipient_hash(recipient)
     if recipient_hash in email_diffs_store:
-        return list(email_diffs_store[recipient_hash]["preferences"])
+        preferences = list(email_diffs_store[recipient_hash]["preferences"])
+        
+        # Add the most recent LLM analysis if available
+        if email_diffs_store[recipient_hash]["analyses"]:
+            latest_analysis = email_diffs_store[recipient_hash]["analyses"][-1]
+            if "llm_analysis" in latest_analysis:
+                preferences.append(f"LLM Analysis: {latest_analysis['llm_analysis']}")
+        
+        return preferences
     return []
 
 try:
@@ -156,8 +186,9 @@ async def _generate_email_with_openai(payload):
     # Build system prompt with learned preferences
     system_base = (
         "You are an assistant that turns bullet points into a polished, concise, professional email. "
-        "Return JSON with keys 'recipient', 'subject' and 'body'. Keep the email clear and readable. Dont use bullet points."
-        "Pretend you are hilary clinton so title each email from Hilary Clinton"
+        "Return JSON with keys 'recipient', 'subject' and 'body'. Keep the email clear and readable. "
+        "Pretend you are hilary clinton so title each email from Hilary Clinton. "
+        "Pay close attention to the user's learned preferences and writing style."
     )
     
     if learned_preferences:
@@ -182,6 +213,7 @@ async def _generate_email_with_openai(payload):
         user_instructions["learned_preferences"] = learned_preferences
 
     try:
+        print("MESSAGE INPUT", user_instructions)
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
             response_format={"type": "json_object"},
@@ -230,7 +262,10 @@ async def analyze_email_diff_endpoint(request: dict = Body(...)):
     recipient = request.get("recipient")
     generated_content = request.get("generated_content")
     final_content = request.get("final_content")
-    analysis = analyze_email_diffs(recipient, generated_content, final_content)
+    print("ai generated email", generated_content)
+    print("final email", final_content)
+    analysis = await analyze_email_diffs(recipient, generated_content, final_content)
+    print("ANALYSIS", analysis)
     return analysis
 
 @router.get("/api/user-preferences/{recipient}")
@@ -238,6 +273,18 @@ async def get_user_preferences_endpoint(recipient: str):
     """Get learned preferences for a specific recipient"""
     preferences = get_user_preferences(recipient)
     return {"recipient": recipient, "preferences": preferences}
+
+@router.get("/api/stored-email/{email_id}")
+async def get_stored_email_endpoint(email_id: str):
+    """Get a stored generated email by ID"""
+    if email_id in generated_emails_store:
+        return {
+            "email_id": email_id,
+            "generated_content": generated_emails_store[email_id]["generated"],
+            "timestamp": generated_emails_store[email_id]["timestamp"]
+        }
+    else:
+        return {"error": "Email not found"}, 404
 
 @router.get("/api/email-diffs")
 async def get_all_email_diffs():

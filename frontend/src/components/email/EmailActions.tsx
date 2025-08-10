@@ -30,7 +30,11 @@ interface EmailActionsProps {
   onActionComplete?: () => void;
 }
 
-export const EmailActions = ({ email, variant = "full", onActionComplete }: EmailActionsProps) => {
+export const EmailActions = ({
+  email,
+  variant = "full",
+  onActionComplete,
+}: EmailActionsProps) => {
   const toast = useToast();
   const { moveEmail, toggleTag, markAsRead, deleteEmail } = useEmailStore();
 
@@ -188,84 +192,13 @@ export const EmailActions = ({ email, variant = "full", onActionComplete }: Emai
         <Tooltip>
           <TooltipTrigger>
             <Button variant="ghost" size="sm" onClick={handleStar}>
-              <StarIcon className={`size-3 ${isStarred ? "fill-yellow-400 text-yellow-400" : ""}`} />
+              <StarIcon
+                className={`size-3 ${isStarred ? "fill-yellow-400 text-yellow-400" : ""}`}
+              />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{isStarred ? "Unstar" : "Star"}</TooltipContent>
         </Tooltip>
-        <DropdownMenu>
-          <DropdownMenuTrigger>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button size="sm" variant="ghost" onClick={(e) => e.stopPropagation()}>
-                  <MoreHorizontal className="size-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>More actions</TooltipContent>
-            </Tooltip>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              {email.unread ? (
-                <DropdownMenuItem onClick={(e) => handleMarkAsRead(true, e)}>
-                  Mark as Read
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem onClick={(e) => handleMarkAsRead(false, e)}>
-                  Mark as Unread
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                <Reply className="size-4 mr-2" />
-                Reply
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                <Forward className="size-4 mr-2" />
-                Forward
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                <Clock className="size-4 mr-2" />
-                Snooze
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Move to</DropdownMenuLabel>
-              <DropdownMenuItem onClick={(e) => handleMoveToLocation(EmailLocation.archive, e)}>
-                Archive
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => handleMoveToLocation(EmailLocation.spam, e)}>
-                Spam
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => handleMoveToLocation(EmailLocation.trash, e)}>
-                Trash
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Labels</DropdownMenuLabel>
-              <DropdownMenuCheckboxItem
-                checked={email.tags.includes(EmailTag.important)}
-                onCheckedChange={() => handleToggleTag(EmailTag.important, {} as React.MouseEvent)}
-              >
-                Important
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={email.tags.includes(EmailTag.work)}
-                onCheckedChange={() => handleToggleTag(EmailTag.work, {} as React.MouseEvent)}
-              >
-                Work
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={email.tags.includes(EmailTag.personal)}
-                onCheckedChange={() => handleToggleTag(EmailTag.personal, {} as React.MouseEvent)}
-              >
-                Personal
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     );
   }
@@ -340,13 +273,19 @@ export const EmailActions = ({ email, variant = "full", onActionComplete }: Emai
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuLabel>Move to</DropdownMenuLabel>
-            <DropdownMenuItem onClick={(e) => handleMoveToLocation(EmailLocation.archive, e)}>
+            <DropdownMenuItem
+              onClick={(e) => handleMoveToLocation(EmailLocation.archive, e)}
+            >
               Archive
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => handleMoveToLocation(EmailLocation.spam, e)}>
+            <DropdownMenuItem
+              onClick={(e) => handleMoveToLocation(EmailLocation.spam, e)}
+            >
               Spam
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => handleMoveToLocation(EmailLocation.trash, e)}>
+            <DropdownMenuItem
+              onClick={(e) => handleMoveToLocation(EmailLocation.trash, e)}
+            >
               Trash
             </DropdownMenuItem>
           </DropdownMenuGroup>
@@ -355,19 +294,25 @@ export const EmailActions = ({ email, variant = "full", onActionComplete }: Emai
             <DropdownMenuLabel>Labels</DropdownMenuLabel>
             <DropdownMenuCheckboxItem
               checked={email.tags.includes(EmailTag.important)}
-              onCheckedChange={() => handleToggleTag(EmailTag.important, {} as React.MouseEvent)}
+              onCheckedChange={() =>
+                handleToggleTag(EmailTag.important, {} as React.MouseEvent)
+              }
             >
               Important
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={email.tags.includes(EmailTag.work)}
-              onCheckedChange={() => handleToggleTag(EmailTag.work, {} as React.MouseEvent)}
+              onCheckedChange={() =>
+                handleToggleTag(EmailTag.work, {} as React.MouseEvent)
+              }
             >
               Work
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={email.tags.includes(EmailTag.personal)}
-              onCheckedChange={() => handleToggleTag(EmailTag.personal, {} as React.MouseEvent)}
+              onCheckedChange={() =>
+                handleToggleTag(EmailTag.personal, {} as React.MouseEvent)
+              }
             >
               Personal
             </DropdownMenuCheckboxItem>

@@ -2,7 +2,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import type { Email } from "@/store/email.schema";
@@ -19,7 +18,7 @@ interface EmailDetailProps {
 
 export const EmailDetail = ({ email, onBack }: EmailDetailProps) => {
   const { markAsRead } = useEmailStore();
-  
+
   // Set up intersection observer for the email content
   const { ref: contentRef } = useIntersectionObserver<HTMLDivElement>({
     threshold: 0.3, // Mark as read when 30% of content is visible
@@ -31,7 +30,7 @@ export const EmailDetail = ({ email, onBack }: EmailDetailProps) => {
       }
     },
   });
-  
+
   // Also mark as read if email changes while component is mounted
   useEffect(() => {
     if (email.unread) {
@@ -41,7 +40,7 @@ export const EmailDetail = ({ email, onBack }: EmailDetailProps) => {
           markAsRead(email.id, true);
         }
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [email.id, email.unread, markAsRead]);
@@ -116,20 +115,10 @@ export const EmailDetail = ({ email, onBack }: EmailDetailProps) => {
       </div>
 
       <ScrollArea className="overscoll-auto grow">
-        <div 
-          ref={contentRef}
-          className="whitespace-pre-wrap p-4 text-sm leading-relaxed"
-        >
+        <div ref={contentRef} className="whitespace-pre-wrap p-4 text-sm leading-relaxed">
           {email.preview}
         </div>
       </ScrollArea>
-
-      <footer className="flex flex-col border-t bg-background p-4">
-        <Textarea placeholder="Type your message..." className="min-h-20 resize-none" />
-        <Button className="mt-2 w-fit self-end" variant="ghost">
-          Send
-        </Button>
-      </footer>
     </div>
   );
 };

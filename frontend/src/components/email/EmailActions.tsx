@@ -193,8 +193,8 @@ export const EmailActions = ({
     onActionComplete?.();
   };
 
-  const handleToggleTag = (tag: EmailTag, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleTag = (tag: EmailTag, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const hasTag = email.tags.includes(tag);
 
     // Track label assignment/removal action
@@ -396,25 +396,19 @@ export const EmailActions = ({
             <DropdownMenuLabel>Labels</DropdownMenuLabel>
             <DropdownMenuCheckboxItem
               checked={email.tags.includes(EmailTag.important)}
-              onCheckedChange={() =>
-                handleToggleTag(EmailTag.important, {} as React.MouseEvent)
-              }
+              onCheckedChange={() => handleToggleTag(EmailTag.important)}
             >
               Important
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={email.tags.includes(EmailTag.work)}
-              onCheckedChange={() =>
-                handleToggleTag(EmailTag.work, {} as React.MouseEvent)
-              }
+              onCheckedChange={() => handleToggleTag(EmailTag.work)}
             >
               Work
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={email.tags.includes(EmailTag.personal)}
-              onCheckedChange={() =>
-                handleToggleTag(EmailTag.personal, {} as React.MouseEvent)
-              }
+              onCheckedChange={() => handleToggleTag(EmailTag.personal)}
             >
               Personal
             </DropdownMenuCheckboxItem>

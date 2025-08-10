@@ -161,3 +161,6 @@ Thumbs.db
 
 # Local environment overrides
 .env.local
+
+Clinton_Email_August_Release/
+clinton_emails_individual/

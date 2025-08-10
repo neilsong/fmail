@@ -200,6 +200,120 @@ def save_emails_to_json(emails: List[EmailData], output_file: str) -> bool:
         print(f"Error saving emails to {output_file}: {e}")
         return False
 
+def save_pdf_emails_individually(extracted_emails: ExtractedEmails, pdf_filename: str, output_dir: str = "extracted_emails") -> bool:
+    """
+    Save emails from a single PDF to its own JSON file.
+    
+    Args:
+        extracted_emails (ExtractedEmails): Emails extracted from PDF
+        pdf_filename (str): Name of the source PDF file
+        output_dir (str): Directory to save individual email files
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Create filename based on PDF name (remove .pdf extension, add .json)
+        json_filename = os.path.splitext(pdf_filename)[0] + ".json"
+        output_path = os.path.join(output_dir, json_filename)
+        
+        # Save the extracted emails
+        emails_data = extracted_emails.model_dump()
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(emails_data, f, indent=2, ensure_ascii=False)
+        
+        return True
+    except Exception as e:
+        print(f"Error saving emails from {pdf_filename}: {e}")
+        return False
+
+def load_existing_extractions(output_dir: str = "extracted_emails") -> set:
+    """
+    Get set of PDF filenames that have already been processed.
+    
+    Args:
+        output_dir (str): Directory containing individual email files
+        
+    Returns:
+        set: Set of PDF filenames (without extension) already processed
+    """
+    if not os.path.exists(output_dir):
+        return set()
+    
+    processed = set()
+    for filename in os.listdir(output_dir):
+        if filename.endswith('.json'):
+            pdf_name = os.path.splitext(filename)[0] + '.pdf'
+            processed.add(pdf_name)
+    
+    return processed
+
+def merge_individual_files(input_dir: str = "extracted_emails", output_file: str = "merged_emails.json") -> List[EmailData]:
+    """
+    Merge all individual email JSON files into one consolidated file.
+    
+    Args:
+        input_dir (str): Directory containing individual email files
+        output_file (str): Path for merged output file
+        
+    Returns:
+        List[EmailData]: All emails from all files
+    """
+    if not os.path.exists(input_dir):
+        print(f"Directory {input_dir} does not exist")
+        return []
+    
+    all_emails = []
+    processed_files = 0
+    failed_files = []
+    
+    print(f"Merging files from {input_dir}...")
+    
+    for filename in sorted(os.listdir(input_dir)):
+        if not filename.endswith('.json'):
+            continue
+            
+        file_path = os.path.join(input_dir, filename)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            # Handle both old format (direct list) and new format (with 'emails' key)
+            if isinstance(data, dict) and 'emails' in data:
+                emails_data = data['emails']
+            elif isinstance(data, list):
+                emails_data = data
+            else:
+                print(f"Warning: Unexpected format in {filename}")
+                continue
+            
+            # Convert to EmailData objects
+            for email_dict in emails_data:
+                try:
+                    email = EmailData(**email_dict)
+                    all_emails.append(email)
+                except Exception as e:
+                    print(f"Warning: Error parsing email in {filename}: {e}")
+            
+            processed_files += 1
+            
+        except Exception as e:
+            print(f"Error reading {filename}: {e}")
+            failed_files.append(filename)
+    
+    print(f"Merged {processed_files} files, {len(all_emails)} total emails")
+    if failed_files:
+        print(f"Failed to read {len(failed_files)} files: {', '.join(failed_files[:5])}")
+    
+    # Save merged file
+    if output_file and save_emails_to_json(all_emails, output_file):
+        print(f"Saved merged emails to: {output_file}")
+    
+    return all_emails
+
 def process_pdf_directory(directory_path: str, output_file: Optional[str] = None, limit: Optional[int] = None) -> List[EmailData]:
     """
     Process all PDF files in a directory and extract email data.
@@ -273,27 +387,48 @@ async def process_pdf_directory_async(
     directory_path: str, 
     output_file: Optional[str] = None, 
     limit: Optional[int] = None,
-    max_concurrent: int = 10
+    max_concurrent: int = 10,
+    individual_files: bool = True,
+    output_dir: str = "extracted_emails",
+    resume: bool = True
 ) -> List[EmailData]:
     """
-    Async version that processes PDFs concurrently for much faster execution.
+    Async version that processes PDFs concurrently with individual file saving.
     
     Args:
         directory_path (str): Path to directory containing PDF files
         output_file (str, optional): Path to save consolidated JSON output
         limit (int, optional): Maximum number of PDFs to process
         max_concurrent (int): Maximum number of concurrent API calls (default: 10)
+        individual_files (bool): Save each PDF's emails to individual files (default: True)
+        output_dir (str): Directory for individual email files (default: "extracted_emails")
+        resume (bool): Skip already processed files (default: True)
         
     Returns:
         List[EmailData]: List of all extracted email data
     """
     pdf_files = glob.glob(os.path.join(directory_path, "*.pdf"))
     
+    # Filter out already processed files if resuming
+    if resume and individual_files:
+        existing = load_existing_extractions(output_dir)
+        original_count = len(pdf_files)
+        pdf_files = [f for f in pdf_files if os.path.basename(f) not in existing]
+        skipped = original_count - len(pdf_files)
+        if skipped > 0:
+            print(f"Resuming: Skipped {skipped} already processed files")
+    
     if limit:
         pdf_files = pdf_files[:limit]
     
     print(f"Found {len(pdf_files)} PDF files to process")
     print(f"Processing with max {max_concurrent} concurrent requests")
+    if individual_files:
+        print(f"Saving individual files to: {output_dir}/")
+    
+    # Create output directory if using individual files
+    if individual_files:
+        os.makedirs(output_dir, exist_ok=True)
     
     # Create semaphore to limit concurrent API calls
     semaphore = asyncio.Semaphore(max_concurrent)
@@ -331,19 +466,32 @@ async def process_pdf_directory_async(
                     print(f"✗ {file_num}/{len(pdf_files)} {filename}: {result}")
                     failed_files.append(filename)
                 elif result and result.emails:
-                    all_emails.extend(result.emails)
-                    successful_extractions += 1
-                    print(f"✓ {file_num}/{len(pdf_files)} {filename}: {len(result.emails)} emails")
+                    # Save individual file if requested
+                    if individual_files:
+                        if save_pdf_emails_individually(result, filename, output_dir):
+                            successful_extractions += 1
+                            all_emails.extend(result.emails)
+                            print(f"✓ {file_num}/{len(pdf_files)} {filename}: {len(result.emails)} emails → {output_dir}/{os.path.splitext(filename)[0]}.json")
+                        else:
+                            print(f"✗ {file_num}/{len(pdf_files)} {filename}: Failed to save individual file")
+                            failed_files.append(filename)
+                    else:
+                        all_emails.extend(result.emails)
+                        successful_extractions += 1
+                        print(f"✓ {file_num}/{len(pdf_files)} {filename}: {len(result.emails)} emails")
                 else:
                     print(f"✗ {file_num}/{len(pdf_files)} {filename}: No emails found")
                     failed_files.append(filename)
             
-            # Save progress after each batch
-            if output_file:
+            # Progress update after each batch
+            elapsed = time.time() - start_time
+            rate = successful_extractions / elapsed if elapsed > 0 else 0
+            
+            if individual_files:
+                print(f"  📁 Batch complete: {len(all_emails)} emails from {successful_extractions} PDFs ({rate:.1f} files/sec)")
+            elif output_file:
                 temp_output = f"temp_{output_file}"
                 if save_emails_to_json(all_emails, temp_output):
-                    elapsed = time.time() - start_time
-                    rate = successful_extractions / elapsed if elapsed > 0 else 0
                     print(f"  💾 Progress saved: {len(all_emails)} emails from {successful_extractions} PDFs ({rate:.1f} files/sec)")
                     
         except KeyboardInterrupt:
@@ -374,88 +522,48 @@ async def process_pdf_directory_async(
     return all_emails
 
 def main():
-    # Example usage with a single PDF
-    print("=== SINGLE PDF PROCESSING ===")
-    email_fp = "Clinton_Email_August_Release/C05765907.pdf"
-    
-    print(f"Processing: {email_fp}")
-    result = extract_emails_from_pdf(email_fp)
-    
-    if result and result.emails:
-        print("\nExtracted email data:")
-        # Convert to JSON for display
-        result_dict = result.model_dump()
-        print(json.dumps(result_dict, indent=2, ensure_ascii=False))
-        
-        print(f"\nFound {len(result.emails)} emails in the PDF")
-        
-        # Show summary of each email
-        for i, email in enumerate(result.emails, 1):
-            print(f"  Email {i}: From {email.sender} - Subject: {email.subject}")
-    else:
-        print("Failed to extract email data from PDF")
-    
-    # Async batch process PDFs in the directory (much faster!)
-    print("\n=== ASYNC BATCH PROCESSING ===")
+    # Async batch process PDFs with individual file structure (much faster!)
+    print("\n=== ASYNC BATCH PROCESSING (INDIVIDUAL FILES) ===")
     all_emails = asyncio.run(process_pdf_directory_async(
         "Clinton_Email_August_Release", 
-        output_file="extracted_emails_async.json",
-        limit=100,  # Process first 100 PDFs as a test batch
-        max_concurrent=15  # Increase concurrency for speed
+        output_file=None,  # No single file output
+        limit=None,  # Process all PDFs
+        max_concurrent=8,
+        individual_files=True,  # Save each PDF to its own file
+        output_dir="clinton_emails_individual",
+        resume=True  # Skip already processed files
     ))
+    
+    # Demonstrate merging individual files
+    print("\n=== MERGING INDIVIDUAL FILES ===")
+    merged_emails = merge_individual_files(
+        input_dir="clinton_emails_individual",
+        output_file="clinton_emails_merged.json"
+    )
 
 async def process_all_emails():
     """
-    Process ALL emails in the Clinton dataset with async concurrency.
-    This is the high-performance version for processing the full dataset.
+    Process ALL emails in the Clinton dataset with individual file structure.
+    This is the high-performance, resumable version for the full dataset.
     """
-    print("=== PROCESSING ALL CLINTON EMAILS (ASYNC) ===")
+    print("=== PROCESSING ALL CLINTON EMAILS (INDIVIDUAL FILES) ===")
     print("This will process all 4,368+ PDFs with concurrent API calls")
+    print("Each PDF's emails will be saved to individual files for better reliability")
     
     all_emails = await process_pdf_directory_async(
         "Clinton_Email_August_Release", 
-        output_file="clinton_emails_complete.json",
+        output_file=None,  # No single file - use individual files
         limit=None,  # Process ALL PDFs
-        max_concurrent=20  # High concurrency for maximum speed
+        max_concurrent=16,  # Balanced concurrency
+        individual_files=True,
+        output_dir="clinton_emails_complete",
+        resume=True  # Resume from where we left off
     )
+    print(f"\n🎉 PROCESSING COMPLETE!")
+    print(f"Individual files saved to: clinton_emails_complete/")
+    print(f"Run merge_individual_files() to create consolidated JSON")
     
-    print(f"\n🎉 COMPLETE! Extracted {len(all_emails)} total emails from Clinton dataset")
     return all_emails
 
 if __name__ == "__main__":
     main()
-
-# To process ALL emails, uncomment and run:
-# asyncio.run(process_all_emails())
-
-# Example usage:
-# 
-# # Extract emails from a single PDF (returns ExtractedEmails object)
-# result = extract_emails_from_pdf("path/to/email.pdf")
-# if result:
-#     for email in result.emails:
-#         print(f"From: {email.sender}")
-#         print(f"Subject: {email.subject}")
-#         print(f"Text: {email.text[:100]}...")
-#         print(f"To: {', '.join(email.receiver)}")
-#         if email.cc:
-#             print(f"CC: {', '.join(email.cc)}")
-#
-# # Or use the convenience function for just the email list
-# emails = get_emails_list("path/to/email.pdf")
-# for email in emails:
-#     print(f"Email from {email.sender} sent at {email.sent_time}")
-#
-# # Process multiple PDFs
-# all_emails = process_pdf_directory(
-#     "Clinton_Email_August_Release/", 
-#     output_file="all_emails.json",
-#     limit=10  # Process first 10 PDFs only
-# )
-#
-# # Access individual email properties with type safety
-# for email in all_emails:
-#     print(f"From: {email.sender}")
-#     print(f"Sent: {email.sent_time}")
-#     print(f"Recipients: {len(email.receiver)}")
-#     print(f"Source: {email.source_file}")

@@ -1,4 +1,5 @@
 import { mockEmails } from "@/data/emails";
+import { loadHillaryEmails, loadHillaryEmailsSubset, loadHillaryReceivedEmails, loadHillaryReceivedEmailsSubset } from "@/data/hillaryEmailLoader";
 import { workflowService } from "@/services/WorkflowService";
 import type { Email, EmailLocation, EmailTag } from "@/store/email.schema";
 import { EmailLocation as EL } from "@/store/email.schema";
@@ -16,6 +17,11 @@ interface EmailStore {
   composeModalOpen: boolean;
 
   setEmails: (emails: Email[]) => void;
+  addEmails: (emails: Email[]) => void;
+  loadHillaryEmails: () => Promise<void>;
+  loadHillaryEmailsSubset: (limit?: number) => Promise<void>;
+  loadHillaryReceivedEmails: () => Promise<void>;
+  loadHillaryReceivedEmailsSubset: (limit?: number) => Promise<void>;
   setSelectedEmail: (email: Email | null) => void;
   setCurrentView: (view: "home" | "detail") => void;
   setCurrentLocation: (location: EmailLocation | "all") => void;
@@ -43,6 +49,26 @@ interface EmailStore {
   getTagCount: (tag: EmailTag) => number;
 }
 
+// Auto-load Hillary emails on store creation
+const initializeStore = async () => {
+  try {
+    // Load both sent and received emails in parallel for better performance
+    const [hillarySentEmails, hillaryReceivedEmails] = await Promise.all([
+      loadHillaryEmails(), // Sent emails
+      loadHillaryReceivedEmails() // Received emails
+    ]);
+    
+    // Add both sets of emails to the store
+    const store = useEmailStore.getState();
+    store.addEmails(hillarySentEmails);
+    store.addEmails(hillaryReceivedEmails);
+    
+    console.log(`Hillary emails loaded automatically on startup: ${hillarySentEmails.length} sent, ${hillaryReceivedEmails.length} received`);
+  } catch (error) {
+    console.error('Failed to auto-load Hillary emails:', error);
+  }
+};
+
 export const useEmailStore = create<EmailStore>((set, get) => ({
   emails: mockEmails,
   selectedEmail: null,
@@ -55,6 +81,48 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   composeModalOpen: false,
 
   setEmails: (emails) => set({ emails }),
+  addEmails: (emails) => set((state) => ({ emails: [...state.emails, ...emails] })),
+  
+  loadHillaryEmails: async () => {
+    try {
+      const hillaryEmails = await loadHillaryEmails();
+      set((state) => ({ emails: [...state.emails, ...hillaryEmails] }));
+    } catch (error) {
+      console.error('Failed to load Hillary emails:', error);
+      throw error;
+    }
+  },
+  
+  loadHillaryEmailsSubset: async (limit = 50) => {
+    try {
+      const hillaryEmails = await loadHillaryEmailsSubset(limit);
+      set((state) => ({ emails: [...state.emails, ...hillaryEmails] }));
+    } catch (error) {
+      console.error('Failed to load Hillary emails subset:', error);
+      throw error;
+    }
+  },
+  
+  loadHillaryReceivedEmails: async () => {
+    try {
+      const hillaryReceivedEmails = await loadHillaryReceivedEmails();
+      set((state) => ({ emails: [...state.emails, ...hillaryReceivedEmails] }));
+    } catch (error) {
+      console.error('Failed to load Hillary received emails:', error);
+      throw error;
+    }
+  },
+  
+  loadHillaryReceivedEmailsSubset: async (limit = 50) => {
+    try {
+      const hillaryReceivedEmails = await loadHillaryReceivedEmailsSubset(limit);
+      set((state) => ({ emails: [...state.emails, ...hillaryReceivedEmails] }));
+    } catch (error) {
+      console.error('Failed to load Hillary received emails subset:', error);
+      throw error;
+    }
+  },
+  
   setSelectedEmail: (email) =>
     set({ selectedEmail: email, currentView: email ? "detail" : "home" }),
   setCurrentView: (view) => set({ currentView: view }),
@@ -250,3 +318,6 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     return state.emails.filter((email) => email.tags.includes(tag)).length;
   },
 }));
+
+// Initialize Hillary emails on store creation
+initializeStore();

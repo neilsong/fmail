@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 import os
+import json
 
 app = FastAPI(
     title="FMail Backend API",
@@ -124,6 +125,77 @@ async def get_user(user_id: int):
         if user.id == user_id:
             return user
     raise HTTPException(status_code=404, detail="User not found")
+
+# Hillary emails endpoint
+@app.get("/api/hillary-emails")
+async def get_hillary_emails():
+    """Get Hillary Clinton emails from the JSON file"""
+    try:
+        # Path to the Hillary emails JSON file
+        hillary_emails_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "hillary_emails_only.json")
+        
+        if not os.path.exists(hillary_emails_path):
+            raise HTTPException(status_code=404, detail="Hillary emails file not found")
+        
+        with open(hillary_emails_path, 'r', encoding='utf-8') as f:
+            hillary_emails = json.load(f)
+        
+        return hillary_emails
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading Hillary emails: {str(e)}")
+
+@app.get("/api/hillary-emails/subset/{limit}")
+async def get_hillary_emails_subset(limit: int):
+    """Get a subset of Hillary Clinton emails"""
+    try:
+        # Path to the Hillary emails JSON file
+        hillary_emails_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "hillary_emails_only.json")
+        
+        if not os.path.exists(hillary_emails_path):
+            raise HTTPException(status_code=404, detail="Hillary emails file not found")
+        
+        with open(hillary_emails_path, 'r', encoding='utf-8') as f:
+            hillary_emails = json.load(f)
+        
+        # Return only the requested number of emails
+        return hillary_emails[:limit] if limit > 0 else []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading Hillary emails: {str(e)}")
+
+@app.get("/api/hillary-received-emails")
+async def get_hillary_received_emails():
+    """Get Hillary Clinton's received emails from the JSON file"""
+    try:
+        # Path to the Hillary received emails JSON file
+        hillary_received_emails_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "hillary_emails_received.json")
+        
+        if not os.path.exists(hillary_received_emails_path):
+            raise HTTPException(status_code=404, detail="Hillary received emails file not found")
+        
+        with open(hillary_received_emails_path, 'r', encoding='utf-8') as f:
+            hillary_received_emails = json.load(f)
+        
+        return hillary_received_emails
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading Hillary received emails: {str(e)}")
+
+@app.get("/api/hillary-received-emails/subset/{limit}")
+async def get_hillary_received_emails_subset(limit: int):
+    """Get a subset of Hillary Clinton's received emails"""
+    try:
+        # Path to the Hillary received emails JSON file
+        hillary_received_emails_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "hillary_emails_received.json")
+        
+        if not os.path.exists(hillary_received_emails_path):
+            raise HTTPException(status_code=404, detail="Hillary received emails file not found")
+        
+        with open(hillary_received_emails_path, 'r', encoding='utf-8') as f:
+            hillary_received_emails = json.load(f)
+        
+        # Return only the requested number of emails
+        return hillary_received_emails[:limit] if limit > 0 else []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading Hillary received emails: {str(e)}")
 
 # Include LLM-powered email endpoint router
 from .llm_api import router as llm_router  # noqa: E402

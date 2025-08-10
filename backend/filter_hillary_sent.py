@@ -97,7 +97,7 @@ def display_emails(emails, limit=None):
         print("-" * 80)
 
 if __name__ == "__main__":
-    input_file = "all_emails_merged.json"
+    input_file = "all_emails_merged_cleaned.json"
     output_file = "hillary_emails_only.json"
     
     # Filter the emails

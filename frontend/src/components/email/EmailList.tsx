@@ -83,7 +83,7 @@ export const EmailList = ({ onEmailSelect }: EmailListProps) => {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-background md:border-r">
+    <div className="flex h-full flex-col bg-background md:border-r">
       <div className="flex h-14 shrink-0 items-center justify-between border-b px-3">
         <div className="ml-10 flex gap-1 lg:ml-0">
           <h2 className="font-semibold">{getViewTitle()}</h2>
@@ -100,7 +100,7 @@ export const EmailList = ({ onEmailSelect }: EmailListProps) => {
         />
       </div>
 
-      <div className="h-full space-y-2 overflow-y-auto p-2">
+      <div className="flex-1 space-y-2 overflow-y-auto p-2">
         {filteredEmails.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-sm text-muted-foreground">{getEmptyMessage()}</p>

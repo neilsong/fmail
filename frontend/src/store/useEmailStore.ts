@@ -1,9 +1,7 @@
 import { mockEmails } from "@/data/emails";
 import {
   loadHillaryEmails,
-  loadHillaryEmailsSubset,
   loadHillaryReceivedEmails,
-  loadHillaryReceivedEmailsSubset,
 } from "@/data/hillaryEmailLoader";
 import { workflowService } from "@/services/WorkflowService";
 import type { Email, EmailLocation, EmailTag } from "@/store/email.schema";
@@ -20,13 +18,13 @@ interface EmailStore {
   sidebarOpen: boolean;
   searchQuery: string;
   composeModalOpen: boolean;
+  isInitialized: boolean;
 
   setEmails: (emails: Email[]) => void;
   addEmails: (emails: Email[]) => void;
+  removeDuplicates: () => void;
   loadHillaryEmails: () => Promise<void>;
-  loadHillaryEmailsSubset: (limit?: number) => Promise<void>;
   loadHillaryReceivedEmails: () => Promise<void>;
-  loadHillaryReceivedEmailsSubset: (limit?: number) => Promise<void>;
   setSelectedEmail: (email: Email | null) => void;
   setCurrentView: (view: "home" | "detail") => void;
   setCurrentLocation: (location: EmailLocation | "all") => void;
@@ -60,17 +58,27 @@ interface EmailStore {
   getTagCount: (tag: EmailTag) => number;
 }
 
-// Auto-load Hillary emails on store creation
+// Auto-load Hillary emails on store creation (only once)
 const initializeStore = async () => {
+  const store = useEmailStore.getState();
+  
+  // Prevent multiple initializations
+  if (store.isInitialized) {
+    console.log("Store already initialized, skipping auto-load");
+    return;
+  }
+
   try {
+    // Mark as initialized immediately to prevent race conditions
+    useEmailStore.setState({ isInitialized: true });
+
     // Load both sent and received emails in parallel for better performance
     const [hillarySentEmails, hillaryReceivedEmails] = await Promise.all([
       loadHillaryEmails(), // Sent emails
       loadHillaryReceivedEmails(), // Received emails
     ]);
 
-    // Add both sets of emails to the store
-    const store = useEmailStore.getState();
+    // Add both sets of emails to the store using the deduplication logic
     store.addEmails(hillarySentEmails);
     store.addEmails(hillaryReceivedEmails);
 
@@ -79,6 +87,8 @@ const initializeStore = async () => {
     );
   } catch (error) {
     console.error("Failed to auto-load Hillary emails:", error);
+    // Reset initialization flag on error so it can be retried
+    useEmailStore.setState({ isInitialized: false });
   }
 };
 
@@ -92,26 +102,49 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   sidebarOpen: false,
   searchQuery: "",
   composeModalOpen: false,
+  isInitialized: false,
 
   setEmails: (emails) => set({ emails }),
-  addEmails: (emails) => set((state) => ({ emails: [...state.emails, ...emails] })),
+  addEmails: (emails) => set((state) => {
+    // Deduplicate emails based on a combination of sender, subject, and sent_time
+    const existingEmailKeys = new Set(
+      state.emails.map(email => `${email.from}|${email.subject}|${email.time}`)
+    );
+    
+    const newEmails = emails.filter(email => {
+      const emailKey = `${email.from}|${email.subject}|${email.time}`;
+      return !existingEmailKeys.has(emailKey);
+    });
+    
+    console.log(`Adding ${newEmails.length} new emails (filtered out ${emails.length - newEmails.length} duplicates)`);
+    return { emails: [...state.emails, ...newEmails] };
+  }),
+
+  removeDuplicates: () => set((state) => {
+    const uniqueEmailKeys = new Set<string>();
+    const deduplicatedEmails = state.emails.filter(email => {
+      const emailKey = `${email.from}|${email.subject}|${email.time}`;
+      if (uniqueEmailKeys.has(emailKey)) {
+        return false; // Duplicate found
+      }
+      uniqueEmailKeys.add(emailKey);
+      return true;
+    });
+    
+    const duplicatesRemoved = state.emails.length - deduplicatedEmails.length;
+    if (duplicatesRemoved > 0) {
+      console.log(`Removed ${duplicatesRemoved} duplicate emails from existing data`);
+    }
+    
+    return { emails: deduplicatedEmails };
+  }),
 
   loadHillaryEmails: async () => {
     try {
       const hillaryEmails = await loadHillaryEmails();
-      set((state) => ({ emails: [...state.emails, ...hillaryEmails] }));
+      get().addEmails(hillaryEmails);
     } catch (error) {
       console.error("Failed to load Hillary emails:", error);
-      throw error;
-    }
-  },
-
-  loadHillaryEmailsSubset: async (limit = 50) => {
-    try {
-      const hillaryEmails = await loadHillaryEmailsSubset(limit);
-      set((state) => ({ emails: [...state.emails, ...hillaryEmails] }));
-    } catch (error) {
-      console.error("Failed to load Hillary emails subset:", error);
       throw error;
     }
   },
@@ -119,19 +152,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   loadHillaryReceivedEmails: async () => {
     try {
       const hillaryReceivedEmails = await loadHillaryReceivedEmails();
-      set((state) => ({ emails: [...state.emails, ...hillaryReceivedEmails] }));
+      get().addEmails(hillaryReceivedEmails);
     } catch (error) {
       console.error("Failed to load Hillary received emails:", error);
-      throw error;
-    }
-  },
-
-  loadHillaryReceivedEmailsSubset: async (limit = 50) => {
-    try {
-      const hillaryReceivedEmails = await loadHillaryReceivedEmailsSubset(limit);
-      set((state) => ({ emails: [...state.emails, ...hillaryReceivedEmails] }));
-    } catch (error) {
-      console.error("Failed to load Hillary received emails subset:", error);
       throw error;
     }
   },

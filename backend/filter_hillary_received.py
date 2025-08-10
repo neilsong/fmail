@@ -30,15 +30,26 @@ def filter_hillary_received_emails(input_file, output_file=None):
         
         print(f"Total emails in dataset: {len(emails)}")
         
-        # Filter for emails received by Hillary
+        # Filter for emails received by Hillary and deduplicate
         hillary_received_emails = []
+        seen_emails = set()
+        
         for email in emails:
             receivers = email.get('receiver', [])
             # Check if any of Hillary's addresses are in the receiver list
             if any(addr in hillary_addresses for addr in receivers):
-                hillary_received_emails.append(email)
+                # Create a unique key for deduplication
+                email_key = f"{email.get('sender', '')}|{email.get('subject', '')}|{email.get('sent_time', '')}|{email.get('text', '')[:200]}"
+                
+                if email_key not in seen_emails:
+                    hillary_received_emails.append(email)
+                    seen_emails.add(email_key)
         
-        print(f"Emails received by Hillary: {len(hillary_received_emails)}")
+        print(f"Emails received by Hillary (after deduplication): {len(hillary_received_emails)}")
+        
+        # Calculate duplicates removed
+        total_before_dedup = len([e for e in emails if any(addr in hillary_addresses for addr in e.get('receiver', []))])
+        print(f"Duplicates removed: {total_before_dedup - len(hillary_received_emails)}")
         
         # Print summary of receiver patterns found
         receiver_counts = {}

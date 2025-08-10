@@ -3,7 +3,7 @@ import { useEmailStore } from "@/store/useEmailStore";
 import { useState } from "react";
 
 export function HillaryEmailLoader() {
-  const { loadHillaryEmails, loadHillaryEmailsSubset, emails } = useEmailStore();
+  const { loadHillaryEmails, emails, removeDuplicates } = useEmailStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,16 +20,8 @@ export function HillaryEmailLoader() {
     }
   };
 
-  const handleLoadSubset = async (limit: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await loadHillaryEmailsSubset(limit);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load emails");
-    } finally {
-      setLoading(false);
-    }
+  const handleRemoveDuplicates = () => {
+    removeDuplicates();
   };
 
   return (
@@ -38,21 +30,21 @@ export function HillaryEmailLoader() {
       <p className="text-sm text-muted-foreground mb-2">
         Current emails in store: {emails.length}
       </p>
-      <p className="text-sm text-blue-600 mb-4">
+      <p className="text-sm text-blue-600 mb-2">
         📧 Hillary emails will be loaded into the "Sent" tab as read emails
       </p>
+      <p className="text-sm text-muted-foreground mb-4">
+        ✨ Duplicate detection is now active - duplicate emails will be automatically
+        filtered
+      </p>
 
-      <div className="flex gap-2 mb-4">
-        <Button onClick={() => handleLoadSubset(10)} disabled={loading} variant="outline">
-          Load 10 Emails
-        </Button>
-
-        <Button onClick={() => handleLoadSubset(50)} disabled={loading} variant="outline">
-          Load 50 Emails
-        </Button>
-
+      <div className="flex flex-wrap gap-2 mb-4">
         <Button onClick={handleLoadAllEmails} disabled={loading} variant="default">
           Load All Emails
+        </Button>
+
+        <Button onClick={handleRemoveDuplicates} disabled={loading} variant="secondary">
+          Remove Duplicates
         </Button>
       </div>
 

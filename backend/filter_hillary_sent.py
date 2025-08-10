@@ -33,14 +33,22 @@ def filter_hillary_emails(input_file, output_file=None):
         
         print(f"Total emails in dataset: {len(emails)}")
         
-        # Filter for Hillary's emails
+        # Filter for Hillary's emails and deduplicate
         hillary_emails = []
+        seen_emails = set()
+        
         for email in emails:
             sender = email.get('sender', '')
             if sender in hillary_senders:
-                hillary_emails.append(email)
+                # Create a unique key for deduplication
+                email_key = f"{email.get('sender', '')}|{email.get('subject', '')}|{email.get('sent_time', '')}|{email.get('text', '')[:200]}"
+                
+                if email_key not in seen_emails:
+                    hillary_emails.append(email)
+                    seen_emails.add(email_key)
         
-        print(f"Emails sent by Hillary: {len(hillary_emails)}")
+        print(f"Emails sent by Hillary (after deduplication): {len(hillary_emails)}")
+        print(f"Duplicates removed: {len([e for e in emails if e.get('sender', '') in hillary_senders]) - len(hillary_emails)}")
         
         # Print summary of sender patterns found
         sender_counts = {}

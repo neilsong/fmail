@@ -1,5 +1,8 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { EmailLocation, EmailTag } from "@/store/email.schema";
+import { useEmailStore } from "@/store/useEmailStore";
 import {
   Archive,
   Clock,
@@ -12,8 +15,6 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import { useEmailStore } from "@/store/useEmailStore";
-import { EmailLocation, EmailTag } from "@/store/email.schema";
 
 interface EmailSidebarProps {
   isOpen: boolean;
@@ -21,14 +22,16 @@ interface EmailSidebarProps {
 }
 
 export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
-  const { 
-    currentLocation, 
+  const {
+    currentLocation,
     currentTag,
-    setCurrentLocation, 
+    setCurrentLocation,
     setCurrentTag,
     getLocationCount,
     getTagCount,
-    emails
+    emails,
+    setSelectedEmail,
+    setCurrentView,
   } = useEmailStore();
 
   const inboxCount = getLocationCount(EmailLocation.inbox);
@@ -40,16 +43,20 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
   const starredCount = getTagCount(EmailTag.starred);
 
   const unreadInboxCount = emails.filter(
-    e => e.location === EmailLocation.inbox && e.unread
+    (e) => e.location === EmailLocation.inbox && e.unread
   ).length;
 
   const handleLocationClick = (location: EmailLocation | "all") => {
     setCurrentLocation(location);
+    setSelectedEmail(null); // Clear selected email
+    setCurrentView("home"); // Return to home view
   };
 
   const handleStarredClick = () => {
     setCurrentLocation("all");
     setCurrentTag(EmailTag.starred);
+    setSelectedEmail(null); // Clear selected email
+    setCurrentView("home"); // Return to home view
   };
 
   return (
@@ -66,8 +73,8 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
             Compose
           </Button>
           <nav className="flex flex-col gap-1 [&>button]:font-normal">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className={cn(
                 "justify-between gap-2",
                 currentLocation === EmailLocation.inbox && !currentTag && "bg-muted"
@@ -80,15 +87,17 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
               </div>
               <div className="flex items-center gap-1">
                 {unreadInboxCount > 0 && (
-                  <span className="text-xs font-semibold">{unreadInboxCount}</span>
+                  <Badge variant="info" className="h-4 px-1.5 text-[10px]">
+                    {unreadInboxCount}
+                  </Badge>
                 )}
                 <span className="text-xs font-normal text-muted-foreground">
                   {inboxCount}
                 </span>
               </div>
             </Button>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className={cn(
                 "justify-between gap-2",
                 currentTag === EmailTag.starred && "bg-muted"
@@ -105,8 +114,8 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
                 </span>
               )}
             </Button>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className={cn(
                 "justify-between gap-2",
                 currentLocation === EmailLocation.sent && !currentTag && "bg-muted"
@@ -123,8 +132,8 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
                 </span>
               )}
             </Button>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className={cn(
                 "justify-between gap-2",
                 currentLocation === EmailLocation.archive && !currentTag && "bg-muted"
@@ -141,8 +150,8 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
                 </span>
               )}
             </Button>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className={cn(
                 "justify-between gap-2",
                 currentLocation === EmailLocation.snoozed && !currentTag && "bg-muted"
@@ -159,8 +168,8 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
                 </span>
               )}
             </Button>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className={cn(
                 "justify-between gap-2",
                 currentLocation === EmailLocation.spam && !currentTag && "bg-muted"
@@ -177,8 +186,8 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
                 </span>
               )}
             </Button>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className={cn(
                 "justify-between gap-2",
                 currentLocation === EmailLocation.trash && !currentTag && "bg-muted"

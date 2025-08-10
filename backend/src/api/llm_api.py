@@ -115,5 +115,5 @@ async def _generate_email_with_openai(payload):
 
 
 @router.post("/api/generate-email")
-async def generate_email(payload: dict = Body(...)):
+async def generate_email(payload):
     return await _generate_email_with_openai(payload) 

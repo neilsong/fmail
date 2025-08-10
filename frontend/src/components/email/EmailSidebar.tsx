@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import { EmailLocation, EmailTag } from "@/store/email.schema";
 import { useEmailStore } from "@/store/useEmailStore";
@@ -8,11 +9,13 @@ import {
   Clock,
   Inbox,
   MessageSquareXIcon,
+  Moon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
   Pencil,
   Send,
   Star,
+  Sun,
   Trash2,
 } from "lucide-react";
 
@@ -34,6 +37,8 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
     setCurrentView,
     openComposeModal
   } = useEmailStore();
+  
+  const { theme, setTheme } = useTheme();
 
   const inboxCount = getLocationCount(EmailLocation.inbox);
   const spamCount = getLocationCount(EmailLocation.spam);
@@ -68,12 +73,13 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
           isOpen ? "translate-x-0 border-r" : "-translate-x-full"
         )}
       >
-        <div className="flex h-full flex-col gap-2">
-          <Button className="gap-2" onClick={openComposeModal}>
-            <Pencil className="size-4" />
-            Compose
-          </Button>
-          <nav className="flex flex-col gap-1 [&>button]:font-normal">
+        <div className="flex h-full flex-col">
+          <div className="flex flex-col gap-2">
+            <Button className="gap-2" onClick={openComposeModal}>
+              <Pencil className="size-4" />
+              Compose
+            </Button>
+            <nav className="flex-1 flex flex-col gap-1 [&>button]:font-normal">
             <Button
               variant="ghost"
               className={cn(
@@ -205,7 +211,40 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
                 </span>
               )}
             </Button>
-          </nav>
+            </nav>
+          </div>
+          <div className="mt-auto pt-4 border-t">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              onClick={() => {
+                if (theme === "light") {
+                  setTheme("dark");
+                } else if (theme === "dark") {
+                  setTheme("system");
+                } else {
+                  setTheme("light");
+                }
+              }}
+            >
+              {theme === "light" ? (
+                <>
+                  <Sun className="size-4" />
+                  <span>Light</span>
+                </>
+              ) : theme === "dark" ? (
+                <>
+                  <Moon className="size-4" />
+                  <span>Dark</span>
+                </>
+              ) : (
+                <>
+                  <Sun className="size-4" />
+                  <span>System</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
         <Button
           variant="ghost"

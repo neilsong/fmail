@@ -39,9 +39,10 @@ function TooltipPortal({
 }
 
 function TooltipPositioner({
+	className,
 	...props
 }: React.ComponentProps<typeof BaseTooltip.Positioner>) {
-	return <BaseTooltip.Positioner data-slot="tooltip-positioner" {...props} />
+	return <BaseTooltip.Positioner data-slot="tooltip-positioner" className={cn("z-50", className)} {...props} />
 }
 
 function TooltipArrow({

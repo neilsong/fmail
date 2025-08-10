@@ -18,6 +18,7 @@ import {
   ArchiveX,
   Clock,
   Forward,
+  Inbox,
   MoreHorizontal,
   Reply,
   StarIcon,
@@ -45,6 +46,24 @@ export const EmailActions = ({
     const toastId = toast.add({
       title: "Email archived",
       description: "Email has been moved to archive",
+      actionProps: {
+        children: "Undo",
+        onClick: () => {
+          moveEmail(email.id, previousLocation);
+          toast.close(toastId);
+        },
+      },
+    });
+    onActionComplete?.();
+  };
+
+  const handleMoveToInbox = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const previousLocation = email.location;
+    moveEmail(email.id, EmailLocation.inbox);
+    const toastId = toast.add({
+      title: "Moved to inbox",
+      description: "Email has been moved to inbox",
       actionProps: {
         children: "Undo",
         onClick: () => {
@@ -173,22 +192,35 @@ export const EmailActions = ({
   if (variant === "compact") {
     return (
       <div className="flex items-center gap-1">
-        <Tooltip>
-          <TooltipTrigger>
-            <Button variant="ghost" size="sm" onClick={handleArchive}>
-              <ArchiveX className="size-3" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Archive</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger>
-            <Button variant="ghost" size="sm" onClick={handleDelete}>
-              <Trash2 className="size-3" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Delete</TooltipContent>
-        </Tooltip>
+        {email.location === EmailLocation.inbox ? (
+          <Tooltip>
+            <TooltipTrigger>
+              <Button variant="ghost" size="sm" onClick={handleArchive}>
+                <ArchiveX className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Archive</TooltipContent>
+          </Tooltip>
+        ) : email.location !== EmailLocation.archive ? (
+          <Tooltip>
+            <TooltipTrigger>
+              <Button variant="ghost" size="sm" onClick={handleMoveToInbox}>
+                <Inbox className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Move to Inbox</TooltipContent>
+          </Tooltip>
+        ) : null}
+        {email.location !== EmailLocation.trash && (
+          <Tooltip>
+            <TooltipTrigger>
+              <Button variant="ghost" size="sm" onClick={handleDelete}>
+                <Trash2 className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete</TooltipContent>
+          </Tooltip>
+        )}
         <Tooltip>
           <TooltipTrigger>
             <Button variant="ghost" size="sm" onClick={handleStar}>
@@ -206,22 +238,35 @@ export const EmailActions = ({
   // Full variant (for EmailDetail)
   return (
     <div className="flex items-center gap-2">
-      <Tooltip>
-        <TooltipTrigger>
-          <Button variant="ghost" size="icon" onClick={handleArchive}>
-            <ArchiveX className="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Archive</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger>
-          <Button variant="ghost" size="icon" onClick={handleDelete}>
-            <Trash2 className="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Delete</TooltipContent>
-      </Tooltip>
+      {email.location === EmailLocation.inbox ? (
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={handleArchive}>
+              <ArchiveX className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Archive</TooltipContent>
+        </Tooltip>
+      ) : email.location !== EmailLocation.archive ? (
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={handleMoveToInbox}>
+              <Inbox className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Move to Inbox</TooltipContent>
+        </Tooltip>
+      ) : null}
+      {email.location !== EmailLocation.trash && (
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={handleDelete}>
+              <Trash2 className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Delete</TooltipContent>
+        </Tooltip>
+      )}
       <Tooltip>
         <TooltipTrigger>
           <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
@@ -262,7 +307,7 @@ export const EmailActions = ({
               </DropdownMenuItem>
             )}
             <DropdownMenuItem onClick={handleStar}>
-              <StarIcon className="size-4 mr-2" />
+              <StarIcon className={`size-4 mr-2 ${isStarred ? "fill-yellow-400 text-yellow-400" : ""}`} />
               {isStarred ? "Unstar" : "Star"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
@@ -273,21 +318,34 @@ export const EmailActions = ({
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuLabel>Move to</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={(e) => handleMoveToLocation(EmailLocation.archive, e)}
-            >
-              Archive
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => handleMoveToLocation(EmailLocation.spam, e)}
-            >
-              Spam
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => handleMoveToLocation(EmailLocation.trash, e)}
-            >
-              Trash
-            </DropdownMenuItem>
+            {email.location !== EmailLocation.inbox && (
+              <DropdownMenuItem
+                onClick={(e) => handleMoveToLocation(EmailLocation.inbox, e)}
+              >
+                Inbox
+              </DropdownMenuItem>
+            )}
+            {email.location !== EmailLocation.archive && (
+              <DropdownMenuItem
+                onClick={(e) => handleMoveToLocation(EmailLocation.archive, e)}
+              >
+                Archive
+              </DropdownMenuItem>
+            )}
+            {email.location !== EmailLocation.spam && (
+              <DropdownMenuItem
+                onClick={(e) => handleMoveToLocation(EmailLocation.spam, e)}
+              >
+                Spam
+              </DropdownMenuItem>
+            )}
+            {email.location !== EmailLocation.trash && (
+              <DropdownMenuItem
+                onClick={(e) => handleMoveToLocation(EmailLocation.trash, e)}
+              >
+                Trash
+              </DropdownMenuItem>
+            )}
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>

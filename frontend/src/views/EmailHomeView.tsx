@@ -21,7 +21,7 @@ export const EmailHomeView = () => {
   };
 
   return (
-    <div className="relative grid h-screen md:grid-cols-[400px_1fr] lg:grid-cols-[240px_1fr]">
+    <div className="relative h-screen lg:pl-[240px]">
       <EmailSidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
       <EmailList onEmailSelect={handleEmailSelect} />
       <ComposeModal isOpen={composeModalOpen} onClose={closeComposeModal} />

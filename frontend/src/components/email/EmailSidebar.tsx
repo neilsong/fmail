@@ -1,6 +1,6 @@
+import { useTheme } from "@/components/theme-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import { EmailLocation, EmailTag } from "@/store/email.schema";
 import { useEmailStore } from "@/store/useEmailStore";
@@ -46,9 +46,9 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
     emails,
     setSelectedEmail,
     setCurrentView,
-    openComposeModal
+    openComposeModal,
   } = useEmailStore();
-  
+
   const { theme, setTheme } = useTheme();
 
   const inboxCount = getLocationCount(EmailLocation.inbox);
@@ -109,7 +109,7 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
     <>
       <div
         className={cn(
-          "absolute inset-y-0 left-0 z-20 w-[240px] bg-background p-4 transition-transform lg:static lg:translate-x-0 lg:border-r",
+          "fixed inset-y-0 left-0 z-20 w-[240px] bg-background p-4 transition-transform lg:translate-x-0 lg:border-r",
           isOpen ? "translate-x-0 border-r" : "-translate-x-full"
         )}
       >
@@ -118,143 +118,142 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
             <Pencil className="size-4" />
             Compose
           </Button>
-          <div className="flex-1 flex flex-col gap-2 overflow-y-auto">
-            <nav className="flex flex-col gap-1 [&>button]:font-normal">
-            <Button
-              variant="ghost"
-              className={cn(
-                "justify-between gap-2",
-                currentLocation === EmailLocation.inbox && !currentTag && "bg-muted"
-              )}
-              onClick={() => handleLocationClick(EmailLocation.inbox)}
-            >
-              <div className="flex items-center gap-2">
-                <Inbox className="size-4" />
-                Inbox
-              </div>
-              <div className="flex items-center gap-1">
-                {unreadInboxCount > 0 && (
-                  <Badge variant="info" className="h-4 px-1.5 text-[10px]">
-                    {unreadInboxCount}
-                  </Badge>
+          <div className="flex-1 flex flex-col gap-2 min-h-0">
+            <nav className="flex flex-col gap-1 [&>button]:font-normal overflow-y-auto">
+              <Button
+                variant="ghost"
+                className={cn(
+                  "justify-between gap-2",
+                  currentLocation === EmailLocation.inbox && !currentTag && "bg-muted"
                 )}
-                <span className="text-xs font-normal text-muted-foreground">
-                  {inboxCount}
-                </span>
-              </div>
-            </Button>
-            <Button
-              variant="ghost"
-              className={cn(
-                "justify-between gap-2",
-                showStarred && "bg-muted"
-              )}
-              onClick={handleStarredClick}
-            >
-              <div className="flex items-center gap-2">
-                <Star className="size-4" />
-                Starred
-              </div>
-              {starredCount > 0 && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  {starredCount}
-                </span>
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              className={cn(
-                "justify-between gap-2",
-                currentLocation === EmailLocation.sent && !currentTag && "bg-muted"
-              )}
-              onClick={() => handleLocationClick(EmailLocation.sent)}
-            >
-              <div className="flex items-center gap-2">
-                <Send className="size-4" />
-                Sent
-              </div>
-              {sentCount > 0 && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  {sentCount}
-                </span>
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              className={cn(
-                "justify-between gap-2",
-                currentLocation === EmailLocation.archive && !currentTag && "bg-muted"
-              )}
-              onClick={() => handleLocationClick(EmailLocation.archive)}
-            >
-              <div className="flex items-center gap-2">
-                <Archive className="size-4" />
-                Archive
-              </div>
-              {archiveCount > 0 && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  {archiveCount}
-                </span>
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              className={cn(
-                "justify-between gap-2",
-                currentLocation === EmailLocation.snoozed && !currentTag && "bg-muted"
-              )}
-              onClick={() => handleLocationClick(EmailLocation.snoozed)}
-            >
-              <div className="flex items-center gap-2">
-                <Clock className="size-4" />
-                Snoozed
-              </div>
-              {snoozedCount > 0 && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  {snoozedCount}
-                </span>
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              className={cn(
-                "justify-between gap-2",
-                currentLocation === EmailLocation.spam && !currentTag && "bg-muted"
-              )}
-              onClick={() => handleLocationClick(EmailLocation.spam)}
-            >
-              <div className="flex items-center gap-2">
-                <MessageSquareXIcon className="size-4" />
-                Spam
-              </div>
-              {spamCount > 0 && (
-                <span className="text-xs font-normal text-muted-foreground text-destructive">
-                  {spamCount}
-                </span>
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              className={cn(
-                "justify-between gap-2",
-                currentLocation === EmailLocation.trash && !currentTag && "bg-muted"
-              )}
-              onClick={() => handleLocationClick(EmailLocation.trash)}
-            >
-              <div className="flex items-center gap-2">
-                <Trash2 className="size-4" />
-                Trash
-              </div>
-              {trashCount > 0 && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  {trashCount}
-                </span>
-              )}
-            </Button>
+                onClick={() => handleLocationClick(EmailLocation.inbox)}
+              >
+                <div className="flex items-center gap-2">
+                  <Inbox className="size-4" />
+                  Inbox
+                </div>
+                <div className="flex items-center gap-1">
+                  {unreadInboxCount > 0 && (
+                    <Badge variant="info" className="h-4 px-1.5 text-[10px]">
+                      {unreadInboxCount}
+                    </Badge>
+                  )}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {inboxCount}
+                  </span>
+                </div>
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn("justify-between gap-2", showStarred && "bg-muted")}
+                onClick={handleStarredClick}
+              >
+                <div className="flex items-center gap-2">
+                  <Star className="size-4" />
+                  Starred
+                </div>
+                {starredCount > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {starredCount}
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "justify-between gap-2",
+                  currentLocation === EmailLocation.sent && !currentTag && "bg-muted"
+                )}
+                onClick={() => handleLocationClick(EmailLocation.sent)}
+              >
+                <div className="flex items-center gap-2">
+                  <Send className="size-4" />
+                  Sent
+                </div>
+                {sentCount > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {sentCount}
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "justify-between gap-2",
+                  currentLocation === EmailLocation.archive && !currentTag && "bg-muted"
+                )}
+                onClick={() => handleLocationClick(EmailLocation.archive)}
+              >
+                <div className="flex items-center gap-2">
+                  <Archive className="size-4" />
+                  Archive
+                </div>
+                {archiveCount > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {archiveCount}
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "justify-between gap-2",
+                  currentLocation === EmailLocation.snoozed && !currentTag && "bg-muted"
+                )}
+                onClick={() => handleLocationClick(EmailLocation.snoozed)}
+              >
+                <div className="flex items-center gap-2">
+                  <Clock className="size-4" />
+                  Snoozed
+                </div>
+                {snoozedCount > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {snoozedCount}
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "justify-between gap-2",
+                  currentLocation === EmailLocation.spam && !currentTag && "bg-muted"
+                )}
+                onClick={() => handleLocationClick(EmailLocation.spam)}
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquareXIcon className="size-4" />
+                  Spam
+                </div>
+                {spamCount > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground text-destructive">
+                    {spamCount}
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "justify-between gap-2",
+                  currentLocation === EmailLocation.trash && !currentTag && "bg-muted"
+                )}
+                onClick={() => handleLocationClick(EmailLocation.trash)}
+              >
+                <div className="flex items-center gap-2">
+                  <Trash2 className="size-4" />
+                  Trash
+                </div>
+                {trashCount > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {trashCount}
+                  </span>
+                )}
+              </Button>
             </nav>
-            
+
             <div className="mt-4 border-t pt-4">
-              <h3 className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Labels</h3>
+              <h3 className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Labels
+              </h3>
               <nav className="flex flex-col gap-1 [&>button]:font-normal">
                 {Object.entries(labelNames).map(([tag, name]) => {
                   const Icon = labelIcons[tag as EmailTag];

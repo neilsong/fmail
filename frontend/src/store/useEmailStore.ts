@@ -168,8 +168,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   sendEmail: (emailData) => {
     const newEmail: Email = {
       id: Date.now(), // Generate unique ID
-      from: "H",
+      from: "Hillary Clinton",
       email: "HDR22@clintonemail.com",
+      to: emailData.to,
       subject: emailData.subject,
       preview: emailData.body,
       time: new Date().toLocaleString(),

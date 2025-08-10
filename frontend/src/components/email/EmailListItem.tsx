@@ -1,14 +1,15 @@
-import type { Email } from "@/store/email.schema";
+import { EmailLocation, type Email, type EmailLocation as EmailLocationType } from "@/store/email.schema";
 import { Paperclip } from "lucide-react";
 import { useState } from "react";
 import { EmailActions } from "./EmailActions";
 
 interface EmailListItemProps {
   email: Email;
+  currentLocation: EmailLocationType | "all";
   onClick: () => void;
 }
 
-export const EmailListItem = ({ email, onClick }: EmailListItemProps) => {
+export const EmailListItem = ({ email, currentLocation, onClick }: EmailListItemProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -24,7 +25,11 @@ export const EmailListItem = ({ email, onClick }: EmailListItemProps) => {
         <div className="flex items-center gap-4">
           <div className="flex w-[180px] shrink-0 flex-col">
             <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-medium">{email.from}</span>
+              <span className="truncate text-sm font-medium">
+                {currentLocation === EmailLocation.sent && email.to 
+                  ? email.to 
+                  : email.from}
+              </span>
               {email.unread && (
                 <span className="size-1.5 shrink-0 rounded-full bg-emerald-400" />
               )}

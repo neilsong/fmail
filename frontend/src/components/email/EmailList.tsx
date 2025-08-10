@@ -164,6 +164,7 @@ export const EmailList = ({ onEmailSelect }: EmailListProps) => {
               <EmailListItem
                 key={email.id}
                 email={email}
+                currentLocation={currentLocation}
                 onClick={() => onEmailSelect(email.id)}
               />
             ))}

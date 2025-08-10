@@ -44,11 +44,13 @@ export function transformHillaryEmail(
   return {
     id,
     from: senderName,
+    to: hillaryEmail.receiver.join(", "), // Join multiple receivers with comma
     email: senderEmail,
     subject: hillaryEmail.subject,
     preview,
     time: timeString,
     unread: isReceived, // Received emails are unread, sent emails are read
+    starred: false, // Default to not starred
     hasAttachment: false, // Hillary emails don't have attachment info
     location: isReceived ? "inbox" : "sent", // Received go to inbox, sent go to sent
     tags: ["important"], // Tag as important since these are historical documents

@@ -23,6 +23,7 @@ export const EmailTagSchema = z.enum([
 export const EmailSchema = z.object({
   id: z.number(),
   from: z.string(),
+  to: z.string().optional(),
   email: z.email(),
   subject: z.string(),
   preview: z.string(),

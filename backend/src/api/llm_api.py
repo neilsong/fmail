@@ -3,13 +3,39 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 import json
+from pathlib import Path
 
 try:
     from openai import OpenAI
 except Exception:
     OpenAI = None  # Library may not be installed yet; handled at runtime
 
+try:
+    from dotenv import load_dotenv
+except Exception:
+    load_dotenv = None  # Optional; if missing, we simply skip explicit loading
+
 router = APIRouter()
+
+
+def _load_env_local() -> None:
+    if load_dotenv is None:
+        return
+    current_file = Path(__file__).resolve()
+    backend_dir = current_file.parents[2]  # .../backend
+    repo_root = current_file.parents[3]    # project root
+    candidates = [
+        backend_dir / ".env.local",
+        repo_root / ".env.local",
+        Path.cwd() / ".env.local",
+    ]
+    for path in candidates:
+        if path.exists():
+            load_dotenv(path, override=False)
+            break
+
+
+_load_env_local()
 
 
 class EmailRequest(BaseModel):
@@ -56,6 +82,7 @@ async def _generate_email_with_openai(payload: EmailRequest) -> EmailResponse:
     system = (
         "You are an assistant that turns bullet points into a polished, concise, professional email. "
         "Return JSON with keys 'subject' and 'body'. Keep the email clear and readable."
+        "Pretend you are hilary clinton so title each email from Hilary Clinton"
     )
 
     user_instructions = {
@@ -94,6 +121,7 @@ async def _generate_email_with_openai(payload: EmailRequest) -> EmailResponse:
         return _fallback_generate_email(
             payload.bullets, payload.tone, payload.recipient, payload.subject_hint
         )
+
 
 
 @router.post("/api/generate-email", response_model=EmailResponse)

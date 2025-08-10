@@ -159,6 +159,5 @@ uv.lock
 .DS_Store
 Thumbs.db
 
-.env.local
 # Local environment overrides
 .env.local

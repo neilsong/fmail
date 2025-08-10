@@ -15,6 +15,8 @@ interface EmailStore {
   sidebarOpen: boolean;
   searchQuery: string;
   composeModalOpen: boolean;
+  listScrollPosition: number;
+  listCurrentPage: number;
 
   setEmails: (emails: Email[]) => void;
   addEmails: (emails: Email[]) => void;
@@ -34,6 +36,8 @@ interface EmailStore {
   openComposeModal: () => void;
   closeComposeModal: () => void;
   sendEmail: (emailData: { to: string; cc: string; bcc: string; subject: string; body: string }) => void;
+  setListScrollPosition: (position: number) => void;
+  setListCurrentPage: (page: number) => void;
 
   moveEmail: (emailId: number, location: EmailLocation) => void;
   toggleStarred: (emailId: number) => void;
@@ -79,6 +83,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   sidebarOpen: false,
   searchQuery: "",
   composeModalOpen: false,
+  listScrollPosition: 0,
+  listCurrentPage: 1,
 
   setEmails: (emails) => set({ emails }),
   addEmails: (emails) => set((state) => ({ emails: [...state.emails, ...emails] })),
@@ -126,15 +132,37 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   setSelectedEmail: (email) =>
     set({ selectedEmail: email, currentView: email ? "detail" : "home" }),
   setCurrentView: (view) => set({ currentView: view }),
-  setCurrentLocation: (location) => set({ currentLocation: location, currentTag: null, showStarred: false }),
-  setCurrentTag: (tag) => set({ currentTag: tag, showStarred: false }),
-  setShowStarred: (show) => set({ showStarred: show, currentTag: null }),
+  setCurrentLocation: (location) => set({ 
+    currentLocation: location, 
+    currentTag: null, 
+    showStarred: false,
+    listScrollPosition: 0,
+    listCurrentPage: 1
+  }),
+  setCurrentTag: (tag) => set({ 
+    currentTag: tag, 
+    showStarred: false,
+    listScrollPosition: 0,
+    listCurrentPage: 1
+  }),
+  setShowStarred: (show) => set({ 
+    showStarred: show, 
+    currentTag: null,
+    listScrollPosition: 0,
+    listCurrentPage: 1
+  }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
-  setSearchQuery: (query) => set({ searchQuery: query }),
+  setSearchQuery: (query) => set({ 
+    searchQuery: query,
+    listScrollPosition: 0,
+    listCurrentPage: 1
+  }),
   goBack: () => set({ selectedEmail: null, currentView: "home" }),
   openComposeModal: () => set({ composeModalOpen: true }),
   closeComposeModal: () => set({ composeModalOpen: false }),
+  setListScrollPosition: (position) => set({ listScrollPosition: position }),
+  setListCurrentPage: (page) => set({ listCurrentPage: page }),
 
   sendEmail: (emailData) => {
     const newEmail: Email = {

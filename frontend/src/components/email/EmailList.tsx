@@ -1,7 +1,9 @@
 import { Input } from "@/components/ui/input";
 import { EmailLocation, EmailTag } from "@/store/email.schema";
 import { useEmailStore } from "@/store/useEmailStore";
+import { windowed } from "es-toolkit";
 import { Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EmailListItem } from "./EmailListItem";
 
 interface EmailListProps {
@@ -9,16 +11,62 @@ interface EmailListProps {
 }
 
 export const EmailList = ({ onEmailSelect }: EmailListProps) => {
-  const { getFilteredEmails, currentLocation, currentTag, showStarred, searchQuery, setSearchQuery } =
-    useEmailStore();
+  const {
+    getFilteredEmails,
+    currentLocation,
+    currentTag,
+    showStarred,
+    searchQuery,
+    setSearchQuery,
+  } = useEmailStore();
 
   const filteredEmails = getFilteredEmails();
+  const [listCurrentPage, setListCurrentPage] = useState(1);
+  const footerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const PAGE_SIZE = 20;
+  const emailWindows = useMemo(
+    () => windowed(filteredEmails, PAGE_SIZE, PAGE_SIZE),
+    [filteredEmails]
+  );
+  const visibleEmails = useMemo(
+    () => emailWindows.slice(0, listCurrentPage).flat(),
+    [emailWindows, listCurrentPage]
+  );
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && listCurrentPage < emailWindows.length) {
+          setListCurrentPage((prev) => prev + 1);
+        }
+      },
+      {
+        root: null,
+        rootMargin: "100px",
+        threshold: 0.1,
+      }
+    );
+
+    const footerElement = footerRef.current;
+    if (footerElement) {
+      observer.observe(footerElement);
+    }
+
+    return () => {
+      if (footerElement) {
+        observer.unobserve(footerElement);
+      }
+    };
+  }, [listCurrentPage, emailWindows.length]);
 
   const getViewTitle = () => {
     if (showStarred) {
       return "Starred";
     }
-    
+
     if (currentTag) {
       const tagTitles = {
         [EmailTag.important]: "Important",
@@ -100,19 +148,24 @@ export const EmailList = ({ onEmailSelect }: EmailListProps) => {
         />
       </div>
 
-      <div className="flex-1 space-y-2 overflow-y-auto p-2">
+      <div ref={scrollContainerRef} className="flex-1 space-y-2 overflow-y-auto p-2">
         {filteredEmails.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-sm text-muted-foreground">{getEmptyMessage()}</p>
           </div>
         ) : (
-          filteredEmails.map((email) => (
-            <EmailListItem
-              key={email.id}
-              email={email}
-              onClick={() => onEmailSelect(email.id)}
-            />
-          ))
+          <>
+            {visibleEmails.map((email) => (
+              <EmailListItem
+                key={email.id}
+                email={email}
+                onClick={() => onEmailSelect(email.id)}
+              />
+            ))}
+            {visibleEmails.length < filteredEmails.length && (
+              <div ref={footerRef} className="h-px" />
+            )}
+          </>
         )}
       </div>
     </div>

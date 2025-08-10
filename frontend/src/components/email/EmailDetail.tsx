@@ -65,7 +65,7 @@ export const EmailDetail = ({ email, onBack }: EmailDetailProps) => {
         },
       });
     };
-  }, [email]);
+  }, [email.id, email.from, email.subject, email.tags]);
 
   return (
     <div className="flex h-screen flex-col bg-background">

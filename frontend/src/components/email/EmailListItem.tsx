@@ -1,6 +1,6 @@
+import type { Email } from "@/store/email.schema";
 import { Paperclip } from "lucide-react";
 import { useState } from "react";
-import type { Email } from "@/store/email.schema";
 import { EmailActions } from "./EmailActions";
 
 interface EmailListItemProps {
@@ -12,7 +12,7 @@ export const EmailListItem = ({ email, onClick }: EmailListItemProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div 
+    <div
       className="relative"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -39,23 +39,25 @@ export const EmailListItem = ({ email, onClick }: EmailListItemProps) => {
           </div>
 
           <div className="flex w-[100px] shrink-0 items-center justify-end gap-2">
-            {email.hasAttachment && <Paperclip className="size-3 text-muted-foreground" />}
+            {email.hasAttachment && (
+              <Paperclip className="size-3 text-muted-foreground" />
+            )}
             <span className="text-xs text-muted-foreground">{email.time}</span>
           </div>
         </div>
       </button>
 
       {/* Floating Action Shortcuts */}
-      <div 
+      <div
         className={`absolute bottom-2 right-2 z-10 rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg p-2 transition-all duration-200 ease-out ${
-          isHovered 
-            ? 'opacity-100 translate-y-0 pointer-events-auto' 
-            : 'opacity-0 translate-y-2 pointer-events-none'
+          isHovered
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 translate-y-2 pointer-events-none"
         }`}
       >
-        <EmailActions 
-          email={email} 
-          variant="compact" 
+        <EmailActions
+          email={email}
+          variant="compact"
           onActionComplete={() => setIsHovered(false)}
         />
       </div>

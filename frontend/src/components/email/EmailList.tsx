@@ -25,16 +25,16 @@ export const EmailList = ({ onEmailSelect }: EmailListProps) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const PAGE_SIZE = 20;
-  
+
   // Optimize: Calculate visible emails directly without windowing then flattening
   const visibleEmails = useMemo(() => {
     const endIndex = listCurrentPage * PAGE_SIZE;
     return filteredEmails.slice(0, endIndex);
   }, [filteredEmails, listCurrentPage]);
-  
+
   // Calculate if there are more emails to load
   const hasMore = visibleEmails.length < filteredEmails.length;
-  
+
   // Reset page when filters change
   useEffect(() => {
     setListCurrentPage(1);
@@ -167,9 +167,7 @@ export const EmailList = ({ onEmailSelect }: EmailListProps) => {
                 onClick={() => onEmailSelect(email.id)}
               />
             ))}
-            {hasMore && (
-              <div ref={footerRef} className="h-px" />
-            )}
+            {hasMore && <div ref={footerRef} className="h-px" />}
           </>
         )}
       </div>

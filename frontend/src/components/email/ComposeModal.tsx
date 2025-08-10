@@ -1,13 +1,22 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
-import { X, Send, Paperclip, Bold, Italic, Underline, Link, Smile, Sparkles, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useEmailStore } from "@/store/useEmailStore";
 import { toastManager } from "@/hooks/use-toast";
+import { useEmailStore } from "@/store/useEmailStore";
+import {
+  Bold,
+  Italic,
+  Link,
+  Loader2,
+  Paperclip,
+  Send,
+  Smile,
+  Sparkles,
+  Underline,
+  X,
+} from "lucide-react";
+import { useState } from "react";
 
 interface ComposeModalProps {
   isOpen: boolean;
@@ -21,35 +30,46 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
   const [body, setBody] = useState("");
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
-  
+
   // AI mode state
   const [isAIMode, setIsAIMode] = useState(false);
   const [bulletPoints, setBulletPoints] = useState("");
   const [tone, setTone] = useState("friendly");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState<{ subject: string; body: string } | null>(null);
+  const [generatedContent, setGeneratedContent] = useState<{
+    subject: string;
+    body: string;
+  } | null>(null);
   const [generatedEmailId, setGeneratedEmailId] = useState<string>("");
 
   const handleSend = async () => {
     // Send the email
-    sendEmail({ to, subject: isAIMode && generatedContent ? generatedContent.subject : subject, body: isAIMode && generatedContent ? generatedContent.body : body, cc, bcc });
+    sendEmail({
+      to,
+      subject: isAIMode && generatedContent ? generatedContent.subject : subject,
+      body: isAIMode && generatedContent ? generatedContent.body : body,
+      cc,
+      bcc,
+    });
 
     // If this was an AI-generated email, analyze the diffs for learning
     if (isAIMode && generatedContent && generatedEmailId) {
       try {
         // First, get the stored original generated content
-        const storedResponse = await fetch(`http://localhost:8000/api/stored-email/${generatedEmailId}`);
+        const storedResponse = await fetch(
+          `http://localhost:8000/api/stored-email/${generatedEmailId}`
+        );
         let originalGeneratedContent = generatedContent; // fallback to current state
-        
+
         if (storedResponse.ok) {
           const storedData = await storedResponse.json();
           originalGeneratedContent = storedData.generated_content;
         }
-        
-        await fetch('http://localhost:8000/api/analyze-email-diff', {
-          method: 'POST',
+
+        await fetch("http://localhost:8000/api/analyze-email-diff", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             email_id: generatedEmailId,
@@ -57,18 +77,19 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
             generated_content: originalGeneratedContent,
             final_content: {
               subject: isAIMode && generatedContent ? generatedContent.subject : subject,
-              body: isAIMode && generatedContent ? generatedContent.body : body
-            }
-          })
+              body: isAIMode && generatedContent ? generatedContent.body : body,
+            },
+          }),
         });
-        
+
         toastManager.add({
           title: "Preferences learned!",
-          description: "Your email preferences have been saved for future AI generations.",
+          description:
+            "Your email preferences have been saved for future AI generations.",
           type: "success",
         });
       } catch (error) {
-        console.error('Failed to analyze email diff:', error);
+        console.error("Failed to analyze email diff:", error);
         // Continue even if analysis fails
       }
     }
@@ -105,50 +126,50 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
 
     setIsGenerating(true);
     try {
-      const response = await fetch('http://localhost:8000/api/generate-email', {
-        method: 'POST',
+      const response = await fetch("http://localhost:8000/api/generate-email", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          bullets: bulletPoints.split('\n').filter(bp => bp.trim()),
+          bullets: bulletPoints.split("\n").filter((bp) => bp.trim()),
           tone: tone,
           recipient: to || "team",
-          subject: subject || "Follow-up"
-        })
+          subject: subject || "Follow-up",
+        }),
       });
 
       if (response.ok) {
         const data = await response.json();
         const emailId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
+
         setGeneratedContent({
           subject: data.subject,
-          body: data.body
+          body: data.body,
         });
         setGeneratedEmailId(emailId);
-        
+
         // Store the generated email for later diff analysis
         try {
-          await fetch('http://localhost:8000/api/store-generated-email', {
-            method: 'POST',
+          await fetch("http://localhost:8000/api/store-generated-email", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({
               email_id: emailId,
               recipient: to || "team",
               generated_content: {
                 subject: data.subject,
-                body: data.body
-              }
-            })
+                body: data.body,
+              },
+            }),
           });
         } catch (error) {
-          console.error('Failed to store generated email:', error);
+          console.error("Failed to store generated email:", error);
           // Continue even if storage fails
         }
-        
+
         toastManager.add({
           title: "Email generated!",
           description: "AI has generated your email. You can now edit it before sending.",
@@ -156,10 +177,10 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
         });
       } else {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to generate email');
+        throw new Error(errorData.detail || "Failed to generate email");
       }
     } catch (error) {
-      console.error('Error generating email:', error);
+      console.error("Error generating email:", error);
       toastManager.add({
         title: "Generation failed",
         description: "Failed to generate email. Please try again.",
@@ -296,7 +317,9 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
               {!generatedContent && (
                 <div className="px-4 py-3 border-b border-gray-200">
                   <div className="mb-2">
-                    <label className="text-sm font-medium text-gray-600">Bullet Points / Draft:</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      Bullet Points / Draft:
+                    </label>
                   </div>
                   <Textarea
                     value={bulletPoints}
@@ -331,7 +354,9 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
               {generatedContent && (
                 <div className="px-4 py-3 border-b border-gray-200">
                   <div className="mb-2 flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-600">Generated Email (Editable):</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      Generated Email (Editable):
+                    </label>
                     <Button
                       variant="outline"
                       size="sm"
@@ -343,7 +368,9 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
                   </div>
                   <Textarea
                     value={generatedContent.body}
-                    onChange={(e) => setGeneratedContent({ ...generatedContent, body: e.target.value })}
+                    onChange={(e) =>
+                      setGeneratedContent({ ...generatedContent, body: e.target.value })
+                    }
                     className="min-h-[200px] border border-gray-300 p-2 text-sm resize-none"
                     onKeyDown={handleKeyDown}
                   />
@@ -433,7 +460,7 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
                   onClick={handleSend}
                   className="h-8 gap-2 px-4"
                   disabled={
-                    !to.trim() || 
+                    !to.trim() ||
                     (!isAIMode && !subject.trim()) ||
                     (isAIMode && !generatedContent) ||
                     (isAIMode && !generatedContent?.body.trim())

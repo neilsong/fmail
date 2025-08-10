@@ -18,23 +18,29 @@ interface HillaryEmailRaw {
  * @param index - Index for unique ID generation
  * @param isReceived - Whether this is a received email (inbox) or sent email
  */
-export function transformHillaryEmail(hillaryEmail: HillaryEmailRaw, index: number, isReceived: boolean = false): Email {
+export function transformHillaryEmail(
+  hillaryEmail: HillaryEmailRaw,
+  index: number,
+  isReceived: boolean = false
+): Email {
   // Extract email address from sender string like "H <HDR22@clintonemail.com>"
   const senderMatch = hillaryEmail.sender.match(/<([^>]+)>/);
   const senderEmail = senderMatch ? senderMatch[1] : "unknown@clintonemail.com";
-  
+
   // Extract sender name (everything before the <email> part)
-  const senderName = hillaryEmail.sender.replace(/<[^>]+>/, "").trim() || (isReceived ? "Unknown Sender" : "Hillary Clinton");
-  
+  const senderName =
+    hillaryEmail.sender.replace(/<[^>]+>/, "").trim() ||
+    (isReceived ? "Unknown Sender" : "Hillary Clinton");
+
   // Use the full email text (no truncation)
   const preview = hillaryEmail.text;
-  
+
   // Convert the sent_time to a more readable format
   const timeString = new Date(hillaryEmail.sent_time).toLocaleString();
-  
+
   // Generate a unique ID based on the index and source file
   const id = Date.now() + index + (isReceived ? 100000 : 0); // Offset received emails to avoid ID conflicts
-  
+
   return {
     id,
     from: senderName,
@@ -45,7 +51,7 @@ export function transformHillaryEmail(hillaryEmail: HillaryEmailRaw, index: numb
     unread: isReceived, // Received emails are unread, sent emails are read
     hasAttachment: false, // Hillary emails don't have attachment info
     location: isReceived ? "inbox" : "sent", // Received go to inbox, sent go to sent
-    tags: ["important"] // Tag as important since these are historical documents
+    tags: ["important"], // Tag as important since these are historical documents
   };
 }
 
@@ -57,29 +63,28 @@ export async function loadHillaryEmails(): Promise<Email[]> {
     // In a real app, you'd fetch from an API endpoint
     // For now, we'll assume the file is copied to the frontend public folder
     // or accessible via an API endpoint
-    
+
     // Option 1: If you copy the file to frontend/public/
     // const response = await fetch('/hillary_emails_only.json');
-    
+
     // Option 2: If you create an API endpoint in your backend
-    const response = await fetch('http://localhost:8000/api/hillary-emails');
-    
+    const response = await fetch("http://localhost:8000/api/hillary-emails");
+
     if (!response.ok) {
       throw new Error(`Failed to fetch Hillary emails: ${response.statusText}`);
     }
-    
+
     const hillaryEmailsRaw: HillaryEmailRaw[] = await response.json();
-    
+
     // Transform the emails to match our frontend schema
-    const transformedEmails = hillaryEmailsRaw.map((email, index) => 
-      transformHillaryEmail(email, index, false) // false = sent emails
+    const transformedEmails = hillaryEmailsRaw.map(
+      (email, index) => transformHillaryEmail(email, index, false) // false = sent emails
     );
-    
+
     console.log(`Loaded ${transformedEmails.length} Hillary sent emails`);
     return transformedEmails;
-    
   } catch (error) {
-    console.error('Error loading Hillary emails:', error);
+    console.error("Error loading Hillary emails:", error);
     throw error;
   }
 }
@@ -90,24 +95,25 @@ export async function loadHillaryEmails(): Promise<Email[]> {
 export async function loadHillaryEmailsSubset(limit: number = 50): Promise<Email[]> {
   try {
     // Use the subset endpoint for better performance
-    const response = await fetch(`http://localhost:8000/api/hillary-emails/subset/${limit}`);
-    
+    const response = await fetch(
+      `http://localhost:8000/api/hillary-emails/subset/${limit}`
+    );
+
     if (!response.ok) {
       throw new Error(`Failed to fetch Hillary emails subset: ${response.statusText}`);
     }
-    
+
     const hillaryEmailsRaw: HillaryEmailRaw[] = await response.json();
-    
+
     // Transform the emails to match our frontend schema
-    const transformedEmails = hillaryEmailsRaw.map((email, index) => 
-      transformHillaryEmail(email, index, false) // false = sent emails
+    const transformedEmails = hillaryEmailsRaw.map(
+      (email, index) => transformHillaryEmail(email, index, false) // false = sent emails
     );
-    
+
     console.log(`Loaded ${transformedEmails.length} Hillary sent emails (subset)`);
     return transformedEmails;
-    
   } catch (error) {
-    console.error('Error loading Hillary emails subset:', error);
+    console.error("Error loading Hillary emails subset:", error);
     throw error;
   }
 }
@@ -118,24 +124,23 @@ export async function loadHillaryEmailsSubset(limit: number = 50): Promise<Email
 export async function loadHillaryReceivedEmails(): Promise<Email[]> {
   try {
     // Fetch from the received emails API endpoint
-    const response = await fetch('http://localhost:8000/api/hillary-received-emails');
-    
+    const response = await fetch("http://localhost:8000/api/hillary-received-emails");
+
     if (!response.ok) {
       throw new Error(`Failed to fetch Hillary received emails: ${response.statusText}`);
     }
-    
+
     const hillaryEmailsRaw: HillaryEmailRaw[] = await response.json();
-    
+
     // Transform the emails to match our frontend schema
-    const transformedEmails = hillaryEmailsRaw.map((email, index) => 
-      transformHillaryEmail(email, index, true) // true = received emails (inbox)
+    const transformedEmails = hillaryEmailsRaw.map(
+      (email, index) => transformHillaryEmail(email, index, true) // true = received emails (inbox)
     );
-    
+
     console.log(`Loaded ${transformedEmails.length} Hillary received emails`);
     return transformedEmails;
-    
   } catch (error) {
-    console.error('Error loading Hillary received emails:', error);
+    console.error("Error loading Hillary received emails:", error);
     throw error;
   }
 }
@@ -143,27 +148,32 @@ export async function loadHillaryReceivedEmails(): Promise<Email[]> {
 /**
  * Load a subset of Hillary's received emails (useful for testing or pagination)
  */
-export async function loadHillaryReceivedEmailsSubset(limit: number = 50): Promise<Email[]> {
+export async function loadHillaryReceivedEmailsSubset(
+  limit: number = 50
+): Promise<Email[]> {
   try {
     // Use the subset endpoint for better performance
-    const response = await fetch(`http://localhost:8000/api/hillary-received-emails/subset/${limit}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch Hillary received emails subset: ${response.statusText}`);
-    }
-    
-    const hillaryEmailsRaw: HillaryEmailRaw[] = await response.json();
-    
-    // Transform the emails to match our frontend schema
-    const transformedEmails = hillaryEmailsRaw.map((email, index) => 
-      transformHillaryEmail(email, index, true) // true = received emails (inbox)
+    const response = await fetch(
+      `http://localhost:8000/api/hillary-received-emails/subset/${limit}`
     );
-    
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch Hillary received emails subset: ${response.statusText}`
+      );
+    }
+
+    const hillaryEmailsRaw: HillaryEmailRaw[] = await response.json();
+
+    // Transform the emails to match our frontend schema
+    const transformedEmails = hillaryEmailsRaw.map(
+      (email, index) => transformHillaryEmail(email, index, true) // true = received emails (inbox)
+    );
+
     console.log(`Loaded ${transformedEmails.length} Hillary received emails (subset)`);
     return transformedEmails;
-    
   } catch (error) {
-    console.error('Error loading Hillary received emails subset:', error);
+    console.error("Error loading Hillary received emails subset:", error);
     throw error;
   }
 }

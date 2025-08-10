@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { WorkflowSuggestion } from "@/WorkflowTracker";
-import { CheckIcon, XIcon, Sparkles } from "lucide-react";
+import { CheckIcon, Sparkles, XIcon } from "lucide-react";
 
 /**
  * Creates a workflow suggestion toast using the app's toast system
@@ -9,7 +9,7 @@ import { CheckIcon, XIcon, Sparkles } from "lucide-react";
  */
 export const useWorkflowSuggestion = () => {
   const toast = useToast();
-  
+
   const showSuggestion = (
     suggestion: WorkflowSuggestion,
     onAccept: () => void,
@@ -63,10 +63,10 @@ export const useWorkflowSuggestion = () => {
       ),
       duration: 0, // Don't auto-dismiss - user needs to interact
     });
-    
+
     return toastId;
   };
-  
+
   return { showSuggestion };
 };
 
@@ -79,9 +79,13 @@ export const showWorkflowSuggestion = (
   // For now, we'll use a simple approach that works with the existing toast system
   // This can be enhanced later to fully integrate with the toast manager
   console.log("Workflow suggestion:", suggestion.description);
-  
+
   // Create a simple notification-style approach
-  if (window.confirm(`${suggestion.description}\n\nReasoning: ${suggestion.reasoning}\n\nAccept this automation?`)) {
+  if (
+    window.confirm(
+      `${suggestion.description}\n\nReasoning: ${suggestion.reasoning}\n\nAccept this automation?`
+    )
+  ) {
     onAccept();
   } else {
     onReject();

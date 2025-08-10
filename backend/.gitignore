@@ -160,3 +160,5 @@ uv.lock
 Thumbs.db
 
 .env.local
+# Local environment overrides
+.env.local

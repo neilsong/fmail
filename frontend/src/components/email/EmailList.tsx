@@ -1,7 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { EmailLocation, EmailTag } from "@/store/email.schema";
 import { useEmailStore } from "@/store/useEmailStore";
-import { windowed } from "es-toolkit";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EmailListItem } from "./EmailListItem";
@@ -26,20 +25,26 @@ export const EmailList = ({ onEmailSelect }: EmailListProps) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const PAGE_SIZE = 20;
-  const emailWindows = useMemo(
-    () => windowed(filteredEmails, PAGE_SIZE, PAGE_SIZE),
-    [filteredEmails]
-  );
-  const visibleEmails = useMemo(
-    () => emailWindows.slice(0, listCurrentPage).flat(),
-    [emailWindows, listCurrentPage]
-  );
+  
+  // Optimize: Calculate visible emails directly without windowing then flattening
+  const visibleEmails = useMemo(() => {
+    const endIndex = listCurrentPage * PAGE_SIZE;
+    return filteredEmails.slice(0, endIndex);
+  }, [filteredEmails, listCurrentPage]);
+  
+  // Calculate if there are more emails to load
+  const hasMore = visibleEmails.length < filteredEmails.length;
+  
+  // Reset page when filters change
+  useEffect(() => {
+    setListCurrentPage(1);
+  }, [currentLocation, currentTag, showStarred, searchQuery]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
-        if (entry.isIntersecting && listCurrentPage < emailWindows.length) {
+        if (entry.isIntersecting && hasMore) {
           setListCurrentPage((prev) => prev + 1);
         }
       },
@@ -60,7 +65,7 @@ export const EmailList = ({ onEmailSelect }: EmailListProps) => {
         observer.unobserve(footerElement);
       }
     };
-  }, [listCurrentPage, emailWindows.length]);
+  }, [hasMore]);
 
   const getViewTitle = () => {
     if (showStarred) {
@@ -162,7 +167,7 @@ export const EmailList = ({ onEmailSelect }: EmailListProps) => {
                 onClick={() => onEmailSelect(email.id)}
               />
             ))}
-            {visibleEmails.length < filteredEmails.length && (
+            {hasMore && (
               <div ref={footerRef} className="h-px" />
             )}
           </>

@@ -15,10 +15,11 @@ export const EmailList = ({ emails, onEmailSelect }: EmailListProps) => {
           <h2 className="font-semibold">Inbox</h2>
           <span className="text-xs font-normal text-muted-foreground">(12)</span>
         </div>
-        <div className="relative w-2/3 max-w-md">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search emails..." className="pl-10 pr-3" />
-        </div>
+        <Input 
+          placeholder="Search emails..." 
+          leadingIcon={<Search className="size-4" />}
+          inputContainerClassName="w-2/3 max-w-md"
+        />
       </div>
 
       <div className="h-full space-y-2 overflow-y-auto p-2">

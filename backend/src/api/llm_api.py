@@ -1,6 +1,5 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import List, Optional
+from fastapi import Body
 import os
 import json
 from pathlib import Path
@@ -38,25 +37,13 @@ def _load_env_local() -> None:
 _load_env_local()
 
 
-class EmailRequest(BaseModel):
-    bullets: List[str]
-    tone: Optional[str] = "neutral"
-    recipient: Optional[str] = None
-    subject_hint: Optional[str] = None
-
-
-class EmailResponse(BaseModel):
-    subject: str
-    body: str
-
-
 def _fallback_generate_email(
-    bullets: List[str],
-    tone: Optional[str],
-    recipient: Optional[str],
-    subject_hint: Optional[str],
-) -> EmailResponse:
-    subject_seed = subject_hint or (bullets[0] if bullets else "Follow-up")
+    bullets,
+    tone,
+    recipient,
+    subject,
+):
+    subject_seed = subject or (bullets[0] if bullets else "Follow-up")
     subject = f"{subject_seed}"
     greeting = f"Hi {recipient}," if recipient else "Hello,"
     body_lines = [greeting, "", "I wanted to share a quick summary:"]
@@ -67,29 +54,29 @@ def _fallback_generate_email(
         body_lines.append(f"Tone requested: {tone}")
     body_lines.append("")
     body_lines.append("Best regards,\nYour Name")
-    return EmailResponse(subject=subject, body="\n".join(body_lines))
+    return {"recipient": recipient, "subject": subject, "body": "\n".join(body_lines)}
 
 
-async def _generate_email_with_openai(payload: EmailRequest) -> EmailResponse:
+async def _generate_email_with_openai(payload):
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key or OpenAI is None:
         return _fallback_generate_email(
-            payload.bullets, payload.tone, payload.recipient, payload.subject_hint
+            payload.get("bullets", []), payload.get("tone", "neutral"), payload.get("recipient"), payload.get("subject")
         )
 
     client = OpenAI(api_key=api_key)
 
     system = (
         "You are an assistant that turns bullet points into a polished, concise, professional email. "
-        "Return JSON with keys 'subject' and 'body'. Keep the email clear and readable."
+        "Return JSON with keys 'recipient', 'subject' and 'body'. Keep the email clear and readable."
         "Pretend you are hilary clinton so title each email from Hilary Clinton"
     )
 
     user_instructions = {
-        "bullets": payload.bullets,
-        "tone": payload.tone,
-        "recipient": payload.recipient,
-        "subject_hint": payload.subject_hint,
+        "bullets": payload.get("bullets", []),
+        "tone": payload.get("tone", "neutral"),
+        "recipient": payload.get("recipient"),
+        "subject": payload.get("subject"),
         "requirements": [
             "Subject should be short and informative",
             "Body should be a few short paragraphs or a brief intro and a list",
@@ -110,20 +97,23 @@ async def _generate_email_with_openai(payload: EmailRequest) -> EmailResponse:
         content = completion.choices[0].message.content
         data = json.loads(content)
         subject = data.get("subject") or (
-            payload.subject_hint or (payload.bullets[0] if payload.bullets else "")
+            payload.get("subject") or (payload.get("bullets", [])[0] if payload.get("bullets") else "")
         )
         body = data.get("body") or _fallback_generate_email(
-            payload.bullets, payload.tone, payload.recipient, payload.subject_hint
-        ).body
-        return EmailResponse(subject=subject, body=body)
+            payload.get("bullets", []), payload.get("tone", "neutral"), payload.get("recipient"), payload.get("subject")
+        )["body"]
+        return {
+            "recipient": payload.get("recipient"),
+            "subject": subject,
+            "body": body
+        }
     except Exception:
         # Fallback on any error (network, model, or formatting)
         return _fallback_generate_email(
-            payload.bullets, payload.tone, payload.recipient, payload.subject_hint
+            payload.get("bullets", []), payload.get("tone", "neutral"), payload.get("recipient"), payload.get("subject")
         )
 
 
-
-@router.post("/api/generate-email", response_model=EmailResponse)
-async def generate_email(payload: EmailRequest):
+@router.post("/api/generate-email")
+async def generate_email(payload: dict = Body(...)):
     return await _generate_email_with_openai(payload) 

@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { WorkflowSuggestion } from "@/WorkflowTracker";
+import type { WorkflowSuggestion } from "@/WorkflowTracker";
 import { CheckIcon, Sparkles, XIcon } from "lucide-react";
 
 /**

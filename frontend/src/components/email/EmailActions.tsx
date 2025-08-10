@@ -69,6 +69,7 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
       actionProps: {
         children: "Undo",
         onClick: () => {
+          trackAction("undo_archive");
           moveEmail(email.id, previousLocation);
           toast.close(toastId);
         },
@@ -79,6 +80,7 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
 
   const handleMoveToInbox = (e: React.MouseEvent) => {
     e.stopPropagation();
+    trackAction("move_to_inbox");
     const previousLocation = email.location;
     moveEmail(email.id, EmailLocation.inbox);
     const toastId = toast.add({
@@ -87,6 +89,7 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
       actionProps: {
         children: "Undo",
         onClick: () => {
+          trackAction("undo_move_to_inbox");
           moveEmail(email.id, previousLocation);
           toast.close(toastId);
         },
@@ -106,6 +109,7 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
       actionProps: {
         children: "Undo",
         onClick: () => {
+          trackAction("undo_delete");
           moveEmail(email.id, previousLocation);
           toast.close(toastId);
         },
@@ -116,8 +120,8 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
 
   const handleStar = (e: React.MouseEvent) => {
     e.stopPropagation();
-    trackAction("star");
     const isStarred = email.starred;
+    trackAction(isStarred ? "unstar" : "star");
     toggleTag(email.id, EmailTag.starred);
     const toastId = toast.add({
       title: isStarred ? "Star removed" : "Email starred",
@@ -127,6 +131,7 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
       actionProps: {
         children: "Undo",
         onClick: () => {
+          trackAction(isStarred ? "undo_unstar" : "undo_star");
           toggleTag(email.id, EmailTag.starred);
           toast.close(toastId);
         },
@@ -137,6 +142,7 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
 
   const handleMarkAsRead = (read: boolean, e: React.MouseEvent) => {
     e.stopPropagation();
+    trackAction(read ? "mark_read" : "mark_unread");
     markAsRead(email.id, read);
     const toastId = toast.add({
       title: read ? "Marked as read" : "Marked as unread",
@@ -144,6 +150,7 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
       actionProps: {
         children: "Undo",
         onClick: () => {
+          trackAction(read ? "undo_mark_read" : "undo_mark_unread");
           markAsRead(email.id, !read);
           toast.close(toastId);
         },
@@ -154,8 +161,6 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
 
   const handleMoveToLocation = (location: EmailLocation, e: React.MouseEvent) => {
     e.stopPropagation();
-    const previousLocation = email.location;
-    moveEmail(email.id, location);
     const locationNames = {
       [EmailLocation.inbox]: "inbox",
       [EmailLocation.spam]: "spam",
@@ -164,12 +169,16 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
       [EmailLocation.sent]: "sent",
       [EmailLocation.snoozed]: "snoozed",
     };
+    trackAction(`move_to_${locationNames[location]}`);
+    const previousLocation = email.location;
+    moveEmail(email.id, location);
     const toastId = toast.add({
       title: `Moved to ${locationNames[location]}`,
       description: `Email has been moved to ${locationNames[location]}`,
       actionProps: {
         children: "Undo",
         onClick: () => {
+          trackAction(`undo_move_to_${locationNames[location]}`);
           moveEmail(email.id, previousLocation);
           toast.close(toastId);
         },
@@ -181,6 +190,10 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
   const handleToggleTag = (tag: EmailTag, e: React.MouseEvent) => {
     e.stopPropagation();
     const hasTag = email.tags.includes(tag);
+    
+    // Track label assignment/removal action
+    trackAction(hasTag ? "remove_label" : "add_label");
+    
     toggleTag(email.id, tag);
     const tagNames = {
       [EmailTag.important]: "Important",
@@ -200,6 +213,8 @@ export const EmailActions = ({ email, variant = "full", context = "home", onActi
       actionProps: {
         children: "Undo",
         onClick: () => {
+          // Track undo action for label changes
+          trackAction(hasTag ? "undo_remove_label" : "undo_add_label");
           toggleTag(email.id, tag);
           toast.close(toastId);
         },

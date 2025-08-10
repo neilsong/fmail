@@ -1,5 +1,8 @@
 export interface UserAction {
-  action: 'archive' | 'delete' | 'label' | 'star' | 'open' | 'close' | 'mark_read' | 'mark_unread';
+  action: 'archive' | 'delete' | 'star' | 'unstar' | 'open' | 'close' | 'mark_read' | 'mark_unread' | 
+          'add_label' | 'remove_label' | 'move_to_inbox' | 'move_to_spam' | 'move_to_trash' | 'move_to_archive' |
+          'undo_archive' | 'undo_delete' | 'undo_star' | 'undo_unstar' | 'undo_mark_read' | 'undo_mark_unread' |
+          'undo_add_label' | 'undo_remove_label' | 'undo_move_to_inbox' | 'undo_move_to_spam' | 'undo_move_to_trash' | 'undo_move_to_archive';
   email: {
     id: string;
     sender: string;

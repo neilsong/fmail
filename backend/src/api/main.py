@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+import os
 
 app = FastAPI(
     title="FMail Backend API",
@@ -124,6 +125,10 @@ async def get_user(user_id: int):
             return user
     raise HTTPException(status_code=404, detail="User not found")
 
+# Include LLM-powered email endpoint router
+from .llm_api import router as llm_router  # noqa: E402
+app.include_router(llm_router)
+
 # Statistics endpoint
 @app.get("/api/stats")
 async def get_stats():
@@ -138,4 +143,4 @@ async def get_stats():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("api.main:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), reload=True)

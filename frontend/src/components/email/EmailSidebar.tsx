@@ -32,6 +32,7 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
     emails,
     setSelectedEmail,
     setCurrentView,
+    openComposeModal
   } = useEmailStore();
 
   const inboxCount = getLocationCount(EmailLocation.inbox);
@@ -68,7 +69,7 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
         )}
       >
         <div className="flex h-full flex-col gap-2">
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={openComposeModal}>
             <Pencil className="size-4" />
             Compose
           </Button>

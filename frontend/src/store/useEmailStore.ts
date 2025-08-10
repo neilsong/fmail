@@ -11,6 +11,7 @@ interface EmailStore {
   currentTag: EmailTag | null;
   sidebarOpen: boolean;
   searchQuery: string;
+  composeModalOpen: boolean;
 
   setEmails: (emails: Email[]) => void;
   setSelectedEmail: (email: Email | null) => void;
@@ -21,6 +22,9 @@ interface EmailStore {
   setSidebarOpen: (open: boolean) => void;
   setSearchQuery: (query: string) => void;
   goBack: () => void;
+  openComposeModal: () => void;
+  closeComposeModal: () => void;
+  sendEmail: (emailData: { to: string; cc: string; bcc: string; subject: string; body: string }) => void;
 
   moveEmail: (emailId: number, location: EmailLocation) => void;
   toggleTag: (emailId: number, tag: EmailTag) => void;
@@ -42,6 +46,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   currentTag: null,
   sidebarOpen: false,
   searchQuery: "",
+  composeModalOpen: false,
 
   setEmails: (emails) => set({ emails }),
   setSelectedEmail: (email) =>
@@ -53,6 +58,28 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   goBack: () => set({ selectedEmail: null, currentView: "home" }),
+  openComposeModal: () => set({ composeModalOpen: true }),
+  closeComposeModal: () => set({ composeModalOpen: false }),
+
+  sendEmail: (emailData) => {
+    const newEmail: Email = {
+      id: Date.now(), // Generate unique ID
+      from: "me@example.com", // TODO: Get from user settings
+      email: "me@example.com",
+      subject: emailData.subject,
+      preview: emailData.body.substring(0, 100) + (emailData.body.length > 100 ? "..." : ""),
+      time: new Date().toLocaleString(),
+      unread: false,
+      hasAttachment: false,
+      location: "sent",
+      tags: [],
+    };
+
+    set((state) => ({
+      emails: [...state.emails, newEmail],
+      composeModalOpen: false,
+    }));
+  },
 
   moveEmail: (emailId, location) =>
     set((state) => ({

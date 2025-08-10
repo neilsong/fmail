@@ -37,7 +37,7 @@ export const EmailActions = ({
   onActionComplete,
 }: EmailActionsProps) => {
   const toast = useToast();
-  const { moveEmail, toggleTag, markAsRead, deleteEmail } = useEmailStore();
+  const { moveEmail, toggleTag, markAsRead, deleteEmail, toggleStarred } = useEmailStore();
 
   const handleArchive = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -95,8 +95,8 @@ export const EmailActions = ({
 
   const handleStar = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const isStarred = email.tags.includes(EmailTag.starred);
-    toggleTag(email.id, EmailTag.starred);
+    const isStarred = email.starred;
+    toggleStarred(email.id);
     const toastId = toast.add({
       title: isStarred ? "Star removed" : "Email starred",
       description: isStarred
@@ -105,7 +105,7 @@ export const EmailActions = ({
       actionProps: {
         children: "Undo",
         onClick: () => {
-          toggleTag(email.id, EmailTag.starred);
+          toggleStarred(email.id);
           toast.close(toastId);
         },
       },
@@ -169,7 +169,6 @@ export const EmailActions = ({
       [EmailTag.updates]: "Updates",
       [EmailTag.forums]: "Forums",
       [EmailTag.promotions]: "Promotions",
-      [EmailTag.starred]: "Starred",
     };
     const toastId = toast.add({
       title: hasTag ? `Removed "${tagNames[tag]}" tag` : `Added "${tagNames[tag]}" tag`,
@@ -187,7 +186,7 @@ export const EmailActions = ({
     onActionComplete?.();
   };
 
-  const isStarred = email.tags.includes(EmailTag.starred);
+  const isStarred = email.starred;
 
   if (variant === "compact") {
     return (

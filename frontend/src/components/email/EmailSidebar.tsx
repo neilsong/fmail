@@ -6,8 +6,12 @@ import { EmailLocation, EmailTag } from "@/store/email.schema";
 import { useEmailStore } from "@/store/useEmailStore";
 import {
   Archive,
+  Briefcase,
+  CheckSquare,
   Clock,
+  Hash,
   Inbox,
+  MessageCircle,
   MessageSquareXIcon,
   Moon,
   PanelRightCloseIcon,
@@ -16,7 +20,11 @@ import {
   Send,
   Star,
   Sun,
+  Tag,
   Trash2,
+  User,
+  Users,
+  Zap,
 } from "lucide-react";
 
 interface EmailSidebarProps {
@@ -28,9 +36,12 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
   const {
     currentLocation,
     currentTag,
+    showStarred,
     setCurrentLocation,
     setCurrentTag,
+    setShowStarred,
     getLocationCount,
+    getStarredCount,
     getTagCount,
     emails,
     setSelectedEmail,
@@ -46,7 +57,7 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
   const sentCount = getLocationCount(EmailLocation.sent);
   const archiveCount = getLocationCount(EmailLocation.archive);
   const snoozedCount = getLocationCount(EmailLocation.snoozed);
-  const starredCount = getTagCount(EmailTag.starred);
+  const starredCount = getStarredCount();
 
   const unreadInboxCount = emails.filter(
     (e) => e.location === EmailLocation.inbox && e.unread
@@ -60,9 +71,38 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
 
   const handleStarredClick = () => {
     setCurrentLocation("all");
-    setCurrentTag(EmailTag.starred);
+    setShowStarred(true);
     setSelectedEmail(null); // Clear selected email
     setCurrentView("home"); // Return to home view
+  };
+
+  const handleLabelClick = (tag: EmailTag) => {
+    setCurrentLocation("all");
+    setCurrentTag(tag);
+    setSelectedEmail(null); // Clear selected email
+    setCurrentView("home"); // Return to home view
+  };
+
+  const labelIcons = {
+    [EmailTag.important]: Zap,
+    [EmailTag.work]: Briefcase,
+    [EmailTag.personal]: User,
+    [EmailTag.todo]: CheckSquare,
+    [EmailTag.social]: Users,
+    [EmailTag.updates]: MessageCircle,
+    [EmailTag.forums]: Hash,
+    [EmailTag.promotions]: Tag,
+  };
+
+  const labelNames = {
+    [EmailTag.important]: "Important",
+    [EmailTag.work]: "Work",
+    [EmailTag.personal]: "Personal",
+    [EmailTag.todo]: "To-do",
+    [EmailTag.social]: "Social",
+    [EmailTag.updates]: "Updates",
+    [EmailTag.forums]: "Forums",
+    [EmailTag.promotions]: "Promotions",
   };
 
   return (
@@ -74,12 +114,12 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
         )}
       >
         <div className="flex h-full flex-col">
-          <div className="flex flex-col gap-2">
-            <Button className="gap-2" onClick={openComposeModal}>
-              <Pencil className="size-4" />
-              Compose
-            </Button>
-            <nav className="flex-1 flex flex-col gap-1 [&>button]:font-normal">
+          <Button className="gap-2 mb-2" onClick={openComposeModal}>
+            <Pencil className="size-4" />
+            Compose
+          </Button>
+          <div className="flex-1 flex flex-col gap-2 overflow-y-auto">
+            <nav className="flex flex-col gap-1 [&>button]:font-normal">
             <Button
               variant="ghost"
               className={cn(
@@ -107,7 +147,7 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
               variant="ghost"
               className={cn(
                 "justify-between gap-2",
-                currentTag === EmailTag.starred && "bg-muted"
+                showStarred && "bg-muted"
               )}
               onClick={handleStarredClick}
             >
@@ -212,6 +252,37 @@ export const EmailSidebar = ({ isOpen, onToggle }: EmailSidebarProps) => {
               )}
             </Button>
             </nav>
+            
+            <div className="mt-4 border-t pt-4">
+              <h3 className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Labels</h3>
+              <nav className="flex flex-col gap-1 [&>button]:font-normal">
+                {Object.entries(labelNames).map(([tag, name]) => {
+                  const Icon = labelIcons[tag as EmailTag];
+                  const count = getTagCount(tag as EmailTag);
+                  return (
+                    <Button
+                      key={tag}
+                      variant="ghost"
+                      className={cn(
+                        "justify-between gap-2",
+                        currentTag === tag && "bg-muted"
+                      )}
+                      onClick={() => handleLabelClick(tag as EmailTag)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Icon className="size-4" />
+                        {name}
+                      </div>
+                      {count > 0 && (
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {count}
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })}
+              </nav>
+            </div>
           </div>
           <div className="mt-auto pt-4 border-t">
             <Button

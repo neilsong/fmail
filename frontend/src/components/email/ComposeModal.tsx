@@ -1,13 +1,11 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { X, Send, Paperclip, Bold, Italic, Underline, Link, Smile } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useEmailStore } from "@/store/useEmailStore";
 import { toastManager } from "@/hooks/use-toast";
+import { useEmailStore } from "@/store/useEmailStore";
+import { Bold, Italic, Link, Paperclip, Send, Smile, Underline, X } from "lucide-react";
+import { useState } from "react";
 
 interface ComposeModalProps {
   isOpen: boolean;
@@ -24,14 +22,14 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
 
   const handleSend = () => {
     sendEmail({ to, subject, body, cc, bcc });
-    
+
     // Show success toast
     toastManager.add({
       title: "Email sent successfully!",
       description: `"${subject}" has been sent to ${to}`,
       type: "success",
     });
-    
+
     // Reset form
     setTo("");
     setSubject("");
@@ -53,7 +51,9 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
       <Card className="w-full max-w-2xl shadow-2xl">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-medium text-gray-700">New Message</CardTitle>
+            <CardTitle className="text-lg font-medium text-gray-700">
+              New Message
+            </CardTitle>
             <Button
               variant="ghost"
               size="sm"
@@ -64,7 +64,7 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
             </Button>
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-0 p-0">
           {/* To field */}
           <div className="flex items-center border-b border-gray-200 px-4 py-2">
@@ -204,4 +204,4 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
       </Card>
     </div>
   );
-}; 
+};

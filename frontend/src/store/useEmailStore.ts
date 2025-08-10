@@ -9,6 +9,7 @@ interface EmailStore {
   currentView: "home" | "detail";
   currentLocation: EmailLocation | "all";
   currentTag: EmailTag | null;
+  showStarred: boolean;
   sidebarOpen: boolean;
   searchQuery: string;
   composeModalOpen: boolean;
@@ -18,6 +19,7 @@ interface EmailStore {
   setCurrentView: (view: "home" | "detail") => void;
   setCurrentLocation: (location: EmailLocation | "all") => void;
   setCurrentTag: (tag: EmailTag | null) => void;
+  setShowStarred: (show: boolean) => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   setSearchQuery: (query: string) => void;
@@ -27,6 +29,7 @@ interface EmailStore {
   sendEmail: (emailData: { to: string; cc: string; bcc: string; subject: string; body: string }) => void;
 
   moveEmail: (emailId: number, location: EmailLocation) => void;
+  toggleStarred: (emailId: number) => void;
   toggleTag: (emailId: number, tag: EmailTag) => void;
   addTag: (emailId: number, tag: EmailTag) => void;
   removeTag: (emailId: number, tag: EmailTag) => void;
@@ -35,6 +38,7 @@ interface EmailStore {
 
   getFilteredEmails: () => Email[];
   getLocationCount: (location: EmailLocation) => number;
+  getStarredCount: () => number;
   getTagCount: (tag: EmailTag) => number;
 }
 
@@ -44,6 +48,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   currentView: "home",
   currentLocation: EL.inbox,
   currentTag: null,
+  showStarred: false,
   sidebarOpen: false,
   searchQuery: "",
   composeModalOpen: false,
@@ -52,8 +57,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   setSelectedEmail: (email) =>
     set({ selectedEmail: email, currentView: email ? "detail" : "home" }),
   setCurrentView: (view) => set({ currentView: view }),
-  setCurrentLocation: (location) => set({ currentLocation: location, currentTag: null }),
-  setCurrentTag: (tag) => set({ currentTag: tag }),
+  setCurrentLocation: (location) => set({ currentLocation: location, currentTag: null, showStarred: false }),
+  setCurrentTag: (tag) => set({ currentTag: tag, showStarred: false }),
+  setShowStarred: (show) => set({ showStarred: show, currentTag: null }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSearchQuery: (query) => set({ searchQuery: query }),
@@ -70,6 +76,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       preview: emailData.body.substring(0, 100) + (emailData.body.length > 100 ? "..." : ""),
       time: new Date().toLocaleString(),
       unread: false,
+      starred: false,
       hasAttachment: false,
       location: "sent",
       tags: [],
@@ -91,6 +98,17 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           ? { ...state.selectedEmail, location }
           : state.selectedEmail,
       currentView: "home", // Return to home view when email is moved
+    })),
+
+  toggleStarred: (emailId) =>
+    set((state) => ({
+      emails: state.emails.map((email) =>
+        email.id === emailId ? { ...email, starred: !email.starred } : email
+      ),
+      selectedEmail:
+        state.selectedEmail?.id === emailId
+          ? { ...state.selectedEmail, starred: !state.selectedEmail.starred }
+          : state.selectedEmail,
     })),
 
   toggleTag: (emailId, tag) =>
@@ -170,6 +188,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       filtered = filtered.filter((email) => email.location === state.currentLocation);
     }
 
+    if (state.showStarred) {
+      filtered = filtered.filter((email) => email.starred);
+    }
+
     if (state.currentTag !== null) {
       filtered = filtered.filter((email) => email.tags.includes(state.currentTag!));
     }
@@ -191,6 +213,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   getLocationCount: (location) => {
     const state = get();
     return state.emails.filter((email) => email.location === location).length;
+  },
+
+  getStarredCount: () => {
+    const state = get();
+    return state.emails.filter((email) => email.starred).length;
   },
 
   getTagCount: (tag) => {

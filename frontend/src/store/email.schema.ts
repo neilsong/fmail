@@ -10,7 +10,6 @@ export const EmailLocationSchema = z.enum([
 ]);
 
 export const EmailTagSchema = z.enum([
-  "starred",
   "important",
   "work",
   "personal",
@@ -29,6 +28,7 @@ export const EmailSchema = z.object({
   preview: z.string(),
   time: z.string(),
   unread: z.boolean(),
+  starred: z.boolean().default(false),
   hasAttachment: z.boolean(),
   location: EmailLocationSchema,
   tags: z.array(EmailTagSchema).default([]),

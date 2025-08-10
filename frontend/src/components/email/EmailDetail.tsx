@@ -4,8 +4,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import type { Email } from "@/store/email.schema";
+import { useEmailStore } from "@/store/useEmailStore";
 import { ArrowLeftIcon } from "lucide-react";
+import { useEffect } from "react";
 import { EmailActions } from "./EmailActions";
 
 interface EmailDetailProps {
@@ -14,6 +17,33 @@ interface EmailDetailProps {
 }
 
 export const EmailDetail = ({ email, onBack }: EmailDetailProps) => {
+  const { markAsRead } = useEmailStore();
+  
+  // Set up intersection observer for the email content
+  const { ref: contentRef } = useIntersectionObserver<HTMLDivElement>({
+    threshold: 0.3, // Mark as read when 30% of content is visible
+    enabled: email.unread, // Only observe if email is unread
+    onIntersect: () => {
+      // Mark email as read when content becomes visible
+      if (email.unread) {
+        markAsRead(email.id, true);
+      }
+    },
+  });
+  
+  // Also mark as read if email changes while component is mounted
+  useEffect(() => {
+    if (email.unread) {
+      // Give a small delay to ensure the email is actually being viewed
+      const timer = setTimeout(() => {
+        if (email.unread) {
+          markAsRead(email.id, true);
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [email.id, email.unread, markAsRead]);
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -48,7 +78,10 @@ export const EmailDetail = ({ email, onBack }: EmailDetailProps) => {
       </div>
 
       <ScrollArea className="overscoll-auto grow">
-        <div className="whitespace-pre-wrap p-4 text-sm leading-relaxed">
+        <div 
+          ref={contentRef}
+          className="whitespace-pre-wrap p-4 text-sm leading-relaxed"
+        >
           {email.preview}
         </div>
       </ScrollArea>

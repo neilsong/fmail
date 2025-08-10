@@ -9,14 +9,28 @@ interface EmailListProps {
 }
 
 export const EmailList = ({ onEmailSelect }: EmailListProps) => {
-  const { getFilteredEmails, currentLocation, currentTag, searchQuery, setSearchQuery } =
+  const { getFilteredEmails, currentLocation, currentTag, showStarred, searchQuery, setSearchQuery } =
     useEmailStore();
 
   const filteredEmails = getFilteredEmails();
 
   const getViewTitle = () => {
-    if (currentTag === EmailTag.starred) {
+    if (showStarred) {
       return "Starred";
+    }
+    
+    if (currentTag) {
+      const tagTitles = {
+        [EmailTag.important]: "Important",
+        [EmailTag.work]: "Work",
+        [EmailTag.personal]: "Personal",
+        [EmailTag.todo]: "To-do",
+        [EmailTag.social]: "Social",
+        [EmailTag.updates]: "Updates",
+        [EmailTag.forums]: "Forums",
+        [EmailTag.promotions]: "Promotions",
+      };
+      return tagTitles[currentTag] || "Filtered";
     }
 
     const locationTitles = {
@@ -37,8 +51,22 @@ export const EmailList = ({ onEmailSelect }: EmailListProps) => {
       return `No emails matching "${searchQuery}"`;
     }
 
-    if (currentTag === EmailTag.starred) {
+    if (showStarred) {
       return "No starred emails";
+    }
+
+    if (currentTag) {
+      const tagMessages = {
+        [EmailTag.important]: "No important emails",
+        [EmailTag.work]: "No work emails",
+        [EmailTag.personal]: "No personal emails",
+        [EmailTag.todo]: "No to-do emails",
+        [EmailTag.social]: "No social emails",
+        [EmailTag.updates]: "No update emails",
+        [EmailTag.forums]: "No forum emails",
+        [EmailTag.promotions]: "No promotional emails",
+      };
+      return tagMessages[currentTag] || "No emails with this label";
     }
 
     const locationMessages = {

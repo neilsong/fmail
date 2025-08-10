@@ -168,11 +168,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   sendEmail: (emailData) => {
     const newEmail: Email = {
       id: Date.now(), // Generate unique ID
-      from: "me@example.com", // TODO: Get from user settings
-      email: "me@example.com",
+      from: "H",
+      email: "HDR22@clintonemail.com",
       subject: emailData.subject,
-      preview:
-        emailData.body.substring(0, 100) + (emailData.body.length > 100 ? "..." : ""),
+      preview: emailData.body,
       time: new Date().toLocaleString(),
       unread: false,
       starred: false,
@@ -330,7 +329,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       );
     }
 
-    return filtered;
+    return filtered.sort(
+      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+    );
   },
 
   getLocationCount: (location) => {

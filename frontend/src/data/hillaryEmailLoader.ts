@@ -40,8 +40,8 @@ export function transformHillaryEmail(
 
   // Generate a more robust unique ID using a hash of email content
   const contentForHash = `${hillaryEmail.sender}|${hillaryEmail.subject}|${hillaryEmail.sent_time}|${hillaryEmail.text.slice(0, 100)}`;
-  const hash = contentForHash.split('').reduce((a, b) => {
-    a = ((a << 5) - a) + b.charCodeAt(0);
+  const hash = contentForHash.split("").reduce((a, b) => {
+    a = (a << 5) - a + b.charCodeAt(0);
     return a & a;
   }, 0);
   const id = Math.abs(hash) + (isReceived ? 1000000 : 0); // Large offset to separate received/sent
@@ -75,7 +75,7 @@ export async function loadHillaryEmails(): Promise<Email[]> {
     // const response = await fetch('/hillary_emails_only.json');
 
     // Option 2: If you create an API endpoint in your backend
-    const response = await fetch("http://localhost:8000/api/hillary-emails");
+    const response = await fetch(`${import.meta.env.VITE_API_HOST}/api/hillary-emails`);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch Hillary emails: ${response.statusText}`);
@@ -96,15 +96,15 @@ export async function loadHillaryEmails(): Promise<Email[]> {
   }
 }
 
-
-
 /**
  * Load Hillary's received emails from the backend JSON file
  */
 export async function loadHillaryReceivedEmails(): Promise<Email[]> {
   try {
     // Fetch from the received emails API endpoint
-    const response = await fetch("http://localhost:8000/api/hillary-received-emails");
+    const response = await fetch(
+      `${import.meta.env.VITE_API_HOST}/api/hillary-received-emails`
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch Hillary received emails: ${response.statusText}`);
@@ -124,5 +124,3 @@ export async function loadHillaryReceivedEmails(): Promise<Email[]> {
     throw error;
   }
 }
-
-

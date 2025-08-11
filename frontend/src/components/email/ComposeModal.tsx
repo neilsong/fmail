@@ -67,7 +67,7 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
       try {
         // First, get the stored original generated content
         const storedResponse = await fetch(
-          `http://localhost:8000/api/stored-email/${generatedEmailId}`
+          `${import.meta.env.VITE_API_HOST}/api/stored-email/${generatedEmailId}`
         );
         let originalGeneratedContent = generatedContent; // fallback to current state
 
@@ -76,7 +76,7 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
           originalGeneratedContent = storedData.generated_content;
         }
 
-        await fetch("http://localhost:8000/api/analyze-email-diff", {
+        await fetch(`${import.meta.env.VITE_API_HOST}/api/analyze-email-diff`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -135,14 +135,17 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
         subject: subject || "Follow-up",
       };
       console.log("Sending generate-email request:", requestBody); // Debug log
-      
-      const response = await fetch("http://localhost:8000/api/generate-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_HOST}/api/generate-email`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -152,13 +155,15 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
         // Check if the response has the expected structure
         const generatedSubject = data.subject || data.generated_subject || "";
         const generatedBody = data.body || data.generated_body || data.content || "";
-        
+
         // Only set generated content if we have actual content
         if (!generatedBody || generatedBody.trim() === "") {
           console.error("No email body in response. Full response:", data);
-          throw new Error("The AI service returned an empty email. Please try again or check if the backend service is configured correctly.");
+          throw new Error(
+            "The AI service returned an empty email. Please try again or check if the backend service is configured correctly."
+          );
         }
-        
+
         setGeneratedContent({
           subject: generatedSubject || "Generated Email",
           body: generatedBody,
@@ -167,7 +172,7 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
 
         // Store the generated email for later diff analysis
         try {
-          await fetch("http://localhost:8000/api/store-generated-email", {
+          await fetch(`${import.meta.env.VITE_API_HOST}/api/store-generated-email`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -193,28 +198,36 @@ export const ComposeModal = ({ isOpen, onClose }: ComposeModalProps) => {
         });
       } else {
         const errorText = await response.text();
-        console.error("Generate email failed. Status:", response.status, "Response:", errorText);
-        
+        console.error(
+          "Generate email failed. Status:",
+          response.status,
+          "Response:",
+          errorText
+        );
+
         let errorData;
         try {
           errorData = JSON.parse(errorText);
         } catch {
           errorData = { detail: errorText || "Failed to generate email" };
         }
-        
-        throw new Error(errorData.detail || errorData.message || "Failed to generate email");
+
+        throw new Error(
+          errorData.detail || errorData.message || "Failed to generate email"
+        );
       }
     } catch (error) {
       console.error("Error generating email:", error);
-      
+
       let errorMessage = "Failed to generate email. Please try again.";
-      
+
       if (error instanceof TypeError && error.message.includes("fetch")) {
-        errorMessage = "Cannot connect to the email generation service. Please ensure the backend is running on http://localhost:8000";
+        errorMessage =
+          "Cannot connect to the email generation service. Please ensure the backend is running on http://localhost:8000";
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-      
+
       toastManager.add({
         title: "Generation failed",
         description: errorMessage,

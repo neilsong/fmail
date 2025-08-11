@@ -44,7 +44,7 @@ export interface WorkflowSuggestion {
   confidence: number;
   reasoning: string;
   generated_function: string;
-  pattern_data: Record<string, any>;
+  trigger_event: string;
   created_at: string;
 }
 
@@ -111,21 +111,35 @@ export class WorkflowTracker {
   }
 
   private handleMessage(message: any) {
+    console.log("🔔 WorkflowTracker received message:", message.type, message);
+    
     switch (message.type) {
       case "workflow_suggestion":
+        console.log("💡 WORKFLOW SUGGESTION RECEIVED:", message.data);
+        console.log("📋 Suggestion details:", {
+          id: message.data.id,
+          description: message.data.description,
+          confidence: message.data.confidence,
+          reasoning: message.data.reasoning
+        });
+        
         if (this.onSuggestionCallback) {
+          console.log("✅ Calling suggestion callback");
           this.onSuggestionCallback(message.data);
+        } else {
+          console.warn("⚠️ NO SUGGESTION CALLBACK SET! Suggestion will not be displayed.");
         }
         break;
 
       case "suggestion_accepted":
+        console.log("✅ Suggestion accepted:", message.data);
         if (this.onConfirmationCallback) {
           this.onConfirmationCallback(message.data.message);
         }
         break;
 
       default:
-        console.log("Unknown message type:", message.type);
+        console.log("❓ Unknown message type:", message.type);
     }
   }
 
@@ -164,6 +178,15 @@ export class WorkflowTracker {
 
       this.ws.send(JSON.stringify(message));
       console.log("Responded to suggestion:", suggestionId, "accepted:", accepted);
+    }
+  }
+
+  sendMessage(message: any) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+      console.log("Sent message:", message.type);
+    } else {
+      console.warn("WebSocket not connected, cannot send message");
     }
   }
 

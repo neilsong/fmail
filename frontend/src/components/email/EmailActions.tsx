@@ -44,11 +44,6 @@ export const EmailActions = ({
   const { moveEmail, toggleTag, markAsRead, deleteEmail, toggleStarred } =
     useEmailStore();
 
-  useEffect(() => {
-    // Initialize the singleton workflow service
-    workflowService.initialize("user123");
-  }, []);
-
   const trackAction = (action: UserAction["action"]) => {
     workflowService.trackAction({
       action,

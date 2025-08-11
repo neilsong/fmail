@@ -1,11 +1,13 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Callable
 from datetime import datetime
 from enum import Enum
 import json
 import uuid
 import os
+import asyncio
+import inspect
 from pathlib import Path
 
 try:
@@ -45,6 +47,7 @@ class ActionType(str, Enum):
     DELETE = "delete"
     LABEL = "label"
     STAR = "star"
+    UNSTAR = "unstar"
     OPEN = "open"
     CLOSE = "close"
     MARK_READ = "mark_read"
@@ -66,7 +69,7 @@ class WorkflowSuggestion(BaseModel):
     confidence: float
     reasoning: str
     generated_function: str
-    pattern_data: Dict[str, Any]
+    trigger_event: str
     created_at: datetime
 
 class SuggestionResponse(BaseModel):
@@ -77,6 +80,168 @@ class SuggestionResponse(BaseModel):
 action_logs: Dict[str, List[UserAction]] = {}  # user_id -> actions
 hook_functions: Dict[str, List[Dict]] = {}  # user_id -> hooks
 suggestions_cache: Dict[str, WorkflowSuggestion] = {}  # suggestion_id -> suggestion
+user_workflows: Dict[str, List[Dict]] = {}  # user_id -> current workflows for LLM context
+
+# Debouncing for LLM requests
+pending_analysis_tasks: Dict[str, asyncio.Task] = {}  # user_id -> analysis task
+analysis_debounce_delay = 1.0  # 1 second debounce delay
+
+# Runtime classes for workflow execution
+class Email:
+    """Email object available in workflow functions"""
+    def __init__(self, email_data: Dict[str, Any]):
+        self.id = email_data.get('id', '')
+        self.sender = email_data.get('sender', '')
+        self.subject = email_data.get('subject', '')
+        self.body = email_data.get('body', '')
+        self.labels = email_data.get('labels', [])
+        self.is_read = email_data.get('is_read', False)
+        self.is_starred = email_data.get('is_starred', False)
+        self.received_at = email_data.get('received_at', datetime.now())
+        self.attachments = email_data.get('attachments', [])
+        self._actions_taken = []  # Track actions for result reporting
+    
+    async def archive(self):
+        """Archive this email"""
+        self._actions_taken.append({'action': 'archive', 'timestamp': datetime.now()})
+        return {'action': 'archive', 'email_id': self.id}
+    
+    async def delete(self):
+        """Delete this email"""
+        self._actions_taken.append({'action': 'delete', 'timestamp': datetime.now()})
+        return {'action': 'delete', 'email_id': self.id}
+    
+    async def mark_read(self):
+        """Mark email as read"""
+        self.is_read = True
+        self._actions_taken.append({'action': 'mark_read', 'timestamp': datetime.now()})
+        return {'action': 'mark_read', 'email_id': self.id}
+    
+    async def mark_unread(self):
+        """Mark email as unread"""
+        self.is_read = False
+        self._actions_taken.append({'action': 'mark_unread', 'timestamp': datetime.now()})
+        return {'action': 'mark_unread', 'email_id': self.id}
+    
+    async def star(self):
+        """Star this email"""
+        self.is_starred = True
+        self._actions_taken.append({'action': 'star', 'timestamp': datetime.now()})
+        return {'action': 'star', 'email_id': self.id}
+    
+    async def unstar(self):
+        """Unstar this email"""
+        self.is_starred = False
+        self._actions_taken.append({'action': 'unstar', 'timestamp': datetime.now()})
+        return {'action': 'unstar', 'email_id': self.id}
+    
+    async def add_label(self, label_name: str):
+        """Add label to email"""
+        if label_name not in self.labels:
+            self.labels.append(label_name)
+        self._actions_taken.append({'action': 'add_label', 'label': label_name, 'timestamp': datetime.now()})
+        return {'action': 'add_label', 'label': label_name, 'email_id': self.id}
+    
+    async def remove_label(self, label_name: str):
+        """Remove label from email"""
+        if label_name in self.labels:
+            self.labels.remove(label_name)
+        self._actions_taken.append({'action': 'remove_label', 'label': label_name, 'timestamp': datetime.now()})
+        return {'action': 'remove_label', 'label': label_name, 'email_id': self.id}
+    
+    async def move_to_folder(self, folder_name: str):
+        """Move email to folder"""
+        self._actions_taken.append({'action': 'move_to_folder', 'folder': folder_name, 'timestamp': datetime.now()})
+        return {'action': 'move_to_folder', 'folder': folder_name, 'email_id': self.id}
+
+class Context:
+    """Context object available in workflow functions"""
+    def __init__(self, context_data: Dict[str, Any]):
+        self.user_id = context_data.get('user_id', '')
+        self.location = context_data.get('location', 'unknown')
+        self.time_of_day = datetime.now().hour
+        self.day_of_week = datetime.now().weekday()
+        self.session_id = context_data.get('session_id', '')
+
+class LLMHelpers:
+    """LLM helper functions available in workflow functions"""
+    
+    @staticmethod
+    async def classify(text: str, categories: List[str]) -> str:
+        """Classify text into one of the given categories"""
+        # Simple keyword-based classification for demo
+        text_lower = text.lower()
+        
+        # Newsletter detection
+        if 'newsletter' in categories:
+            newsletter_keywords = ['newsletter', 'unsubscribe', 'weekly', 'monthly', 'digest']
+            if any(keyword in text_lower for keyword in newsletter_keywords):
+                return 'newsletter'
+        
+        # Promotion detection
+        if 'promotion' in categories:
+            promo_keywords = ['sale', 'discount', 'offer', 'deal', 'promo', '%', 'save']
+            if any(keyword in text_lower for keyword in promo_keywords):
+                return 'promotion'
+        
+        # Default to first category
+        return categories[0] if categories else 'unknown'
+    
+    @staticmethod
+    async def extract(text: str, schema: Dict[str, str]) -> Dict[str, Any]:
+        """Extract structured data from text"""
+        # Simple extraction for demo
+        result = {}
+        text_lower = text.lower()
+        
+        for field, field_type in schema.items():
+            if field_type == 'email':
+                # Simple email extraction
+                import re
+                emails = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text)
+                result[field] = emails[0] if emails else None
+            elif field_type == 'date':
+                # Simple date extraction (placeholder)
+                result[field] = datetime.now().isoformat()
+            else:
+                result[field] = None
+        
+        return result
+    
+    @staticmethod
+    async def decide(question: str, context: str) -> bool:
+        """Make binary decisions"""
+        # Simple decision logic for demo
+        question_lower = question.lower()
+        context_lower = context.lower()
+        
+        # Simple heuristics
+        if 'important' in question_lower and 'urgent' in context_lower:
+            return True
+        if 'spam' in question_lower and ('unsubscribe' in context_lower or 'promotion' in context_lower):
+            return True
+        
+        return False
+    
+    @staticmethod
+    async def summarize(text: str, max_length: int = 100) -> str:
+        """Summarize text content"""
+        # Simple summarization for demo
+        if len(text) <= max_length:
+            return text
+        return text[:max_length-3] + '...'
+    
+    @staticmethod
+    async def match_pattern(text: str, patterns: List[str]) -> Optional[str]:
+        """Match against learned patterns"""
+        text_lower = text.lower()
+        for pattern in patterns:
+            if pattern.lower() in text_lower:
+                return pattern
+        return None
+
+# Global LLM helpers instance
+llm = LLMHelpers()
 user_sessions: Dict[str, List[str]] = {}  # user_id -> recent actions for context
 
 # WebSocket Connection Manager
@@ -84,7 +249,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
         self.user_sessions: Dict[str, Set[str]] = {}
-
+    
     async def connect(self, websocket: WebSocket, user_id: str, session_id: str):
         await websocket.accept()
         connection_key = f"{user_id}:{session_id}"
@@ -93,7 +258,9 @@ class ConnectionManager:
         if user_id not in self.user_sessions:
             self.user_sessions[user_id] = set()
         self.user_sessions[user_id].add(session_id)
-
+        
+        print(f"User {user_id} session {session_id} connected")
+    
     def disconnect(self, user_id: str, session_id: str):
         connection_key = f"{user_id}:{session_id}"
         if connection_key in self.active_connections:
@@ -103,24 +270,57 @@ class ConnectionManager:
             self.user_sessions[user_id].discard(session_id)
             if not self.user_sessions[user_id]:
                 del self.user_sessions[user_id]
-
+        
+        print(f"User {user_id} session {session_id} disconnected")
+    
     async def send_suggestion(self, user_id: str, suggestion: WorkflowSuggestion):
-        if user_id in self.user_sessions:
-            message = {
-                "type": "workflow_suggestion",
-                "data": suggestion.dict()
+        """Send workflow suggestion to all user sessions"""
+        if user_id not in self.user_sessions:
+            return
+        
+        message = {
+            "type": "workflow_suggestion",
+            "data": {
+                "id": suggestion.id,
+                "description": suggestion.description,
+                "confidence": suggestion.confidence,
+                "reasoning": suggestion.reasoning,
+                "generated_function": suggestion.generated_function,
+                "trigger_event": suggestion.trigger_event
             }
-            
-            # Send to all active sessions for this user
-            for session_id in self.user_sessions[user_id]:
-                connection_key = f"{user_id}:{session_id}"
-                if connection_key in self.active_connections:
-                    websocket = self.active_connections[connection_key]
-                    try:
-                        await websocket.send_text(json.dumps(message, default=str))
-                    except:
-                        # Connection closed, clean up
-                        self.disconnect(user_id, session_id)
+        }
+        
+        for session_id in self.user_sessions[user_id].copy():
+            connection_key = f"{user_id}:{session_id}"
+            if connection_key in self.active_connections:
+                try:
+                    await self.active_connections[connection_key].send_text(
+                        json.dumps(message)
+                    )
+                except Exception as e:
+                    print(f"Failed to send suggestion to {connection_key}: {e}")
+                    self.disconnect(user_id, session_id)
+    
+    async def send_workflow_notification(self, user_id: str, notification: Dict[str, Any]):
+        """Send workflow execution notification to all user sessions"""
+        if user_id not in self.user_sessions:
+            return
+        
+        message = {
+            "type": "workflow_notification",
+            "data": notification
+        }
+        
+        for session_id in self.user_sessions[user_id].copy():
+            connection_key = f"{user_id}:{session_id}"
+            if connection_key in self.active_connections:
+                try:
+                    await self.active_connections[connection_key].send_text(
+                        json.dumps(message)
+                    )
+                except Exception as e:
+                    print(f"Failed to send workflow notification to {connection_key}: {e}")
+                    self.disconnect(user_id, session_id)
 
 manager = ConnectionManager()
 
@@ -148,69 +348,219 @@ def get_user_actions(user_id: str, limit: int = 20) -> List[UserAction]:
     return action_logs[user_id][-limit:]
 
 def should_analyze_for_patterns(user_id: str, current_action: UserAction) -> bool:
-    """Simple criteria to decide when to call LLM for analysis"""
-    recent_actions = get_user_actions(user_id, 10)
+    """Decide when to call LLM for analysis based on intentional actions and sufficient history"""
+    recent_actions = get_user_actions(user_id, 20)
     
-    # Only analyze if user has performed at least 3 actions
-    if len(recent_actions) < 3:
+    # Only analyze if user has performed more than 3 actions total
+    if len(recent_actions) <= 3:
         return False
     
-    # Check for repetitive patterns (same action on similar emails)
-    same_action_count = sum(1 for a in recent_actions[-5:] if a.action == current_action.action)
+    # Define intentional user actions that indicate deliberate email management
+    intentional_actions = {
+        ActionType.STAR, ActionType.UNSTAR, ActionType.DELETE, 
+        ActionType.ARCHIVE, ActionType.LABEL, 
+        ActionType.MARK_UNREAD
+    }
     
-    # Analyze if user has done the same action 3+ times recently
-    return same_action_count >= 3
+    # Only analyze for intentional actions
+    if current_action.action not in intentional_actions:
+        return False
+
+    print(f"\n=== PATTERN ANALYSIS CHECK ===")
+    print(f"Current action: {current_action.action} on email from {current_action.email.get('sender', 'unknown')}")
+    print(f"Total recent actions: {len(recent_actions)}")
+    
+    # Show recent actions for context
+    print(f"Recent actions:")
+    for i, action in enumerate(recent_actions[-5:]):
+        marker = "👉" if action.action == current_action.action else "  "
+        print(f"  {marker} {action.action} on email from {action.email.get('sender', 'unknown')}")
+    
+    print(f"✅ TRIGGERING LLM ANALYSIS - Intentional action with sufficient history")
+    print(f"=== END PATTERN CHECK ===\n")
+    return True
+
+def get_python_api_documentation() -> str:
+    """Return comprehensive Python API documentation for LLM to generate workflows"""
+    return """
+# FMail Workflow API Documentation
+
+## Available Email Actions
+- `email.archive()` - Move email to archive
+- `email.delete()` - Move email to trash
+- `email.mark_read()` - Mark email as read
+- `email.mark_unread()` - Mark email as unread
+- `email.star()` - Add star to email
+- `email.unstar()` - Remove star from email
+- `email.add_label(label_name)` - Add label to email
+- `email.remove_label(label_name)` - Remove label from email
+- `email.move_to_folder(folder_name)` - Move to specific folder
+
+## Available Email Properties
+- `email.sender` - Sender email address
+- `email.subject` - Email subject line
+- `email.body` - Email body content
+- `email.labels` - List of current labels
+- `email.is_read` - Boolean read status
+- `email.is_starred` - Boolean starred status
+- `email.received_at` - Datetime when received
+- `email.attachments` - List of attachment info
+
+## Available Context Properties
+- `context.user_id` - Current user ID
+- `context.location` - Where action was triggered ('inbox', 'detail', etc.)
+- `context.time_of_day` - Time when action occurred
+- `context.day_of_week` - Day of week (0=Monday, 6=Sunday)
+
+## Hook Decorators
+- `@hook("email_received")` - Trigger when new email arrives
+- `@hook("email_opened")` - Trigger when email is opened
+- `@hook("email_closed")` - Trigger when email is closed
+- `@hook("before_action")` - Trigger before any user action
+
+## LLM Helper Functions (Available in workflows)
+- `llm.classify(text, categories)` - Classify text into categories
+- `llm.extract(text, schema)` - Extract structured data from text
+- `llm.decide(question, context)` - Make binary decisions
+- `llm.summarize(text, max_length)` - Summarize text content
+- `llm.match_pattern(text, patterns)` - Match against learned patterns
+
+## Example Workflow Functions
+```python
+@hook("email_received")
+async def auto_archive_newsletters(email: Email, context: Context):
+    classification = await llm.classify(email.subject, ["newsletter", "promotion", "regular"])
+    if classification == "newsletter":
+        await email.add_label("Newsletter")
+        await email.archive()
+        return {"action": "archived", "reason": "Detected newsletter"}
+
+@hook("email_received")
+async def auto_label_by_sender(email: Email, context: Context):
+    if email.sender.endswith("@company.com"):
+        await email.add_label("Work")
+        return {"action": "labeled", "label": "Work"}
+
+@hook("email_received")
+async def smart_spam_detection(email: Email, context: Context):
+    is_spam = await llm.decide("Is this spam?", f"Subject: {email.subject}, Sender: {email.sender}")
+    if is_spam:
+        await email.add_label("Spam")
+        await email.delete()
+        return {"action": "deleted", "reason": "Detected as spam"}
+```
+"""
+
+async def debounced_analyze_patterns(user_id: str, current_action: UserAction) -> None:
+    """Debounced wrapper for LLM analysis to prevent overwhelming the LLM with rapid requests"""
+    print(f"⏱️ Starting debounced analysis for user {user_id} (delay: {analysis_debounce_delay}s)")
+    
+    # Wait for debounce delay
+    await asyncio.sleep(analysis_debounce_delay)
+    
+    # Check if this task was cancelled (newer action arrived)
+    current_task = asyncio.current_task()
+    if user_id in pending_analysis_tasks and pending_analysis_tasks[user_id] != current_task:
+        print(f"🚫 Analysis cancelled for user {user_id} - newer action received")
+        return
+    
+    print(f"🔍 Proceeding with LLM analysis for user {user_id}...")
+    suggestion = await analyze_action_patterns_with_llm(user_id, current_action)
+    
+    if suggestion:
+        print(f"✨ Generated suggestion: {suggestion.description}")
+        print(f"   Confidence: {suggestion.confidence}")
+        print(f"   Trigger event: {suggestion.trigger_event}")
+        await manager.send_suggestion(user_id, suggestion)
+    else:
+        print(f"❌ LLM analysis completed but no suggestion generated")
+    
+    # Clean up task reference
+    if user_id in pending_analysis_tasks and pending_analysis_tasks[user_id] == current_task:
+        del pending_analysis_tasks[user_id]
 
 async def analyze_action_patterns_with_llm(user_id: str, current_action: UserAction):
     """Use LLM to analyze user action patterns and suggest automations"""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key or OpenAI is None:
+        print(f"⚠️  No OpenAI API key found, falling back to simple analysis")
         return await analyze_action_patterns_fallback(user_id, current_action)
     
     try:
         client = OpenAI(api_key=api_key)
-        actions = get_user_actions(user_id, limit=20)
+        actions = get_user_actions(user_id, limit=30)  # More context for better analysis
+        existing_workflows = hook_functions.get(user_id, [])
         
-        # Prepare action history for LLM
+        # Prepare comprehensive action history for LLM
         action_history = []
-        for action in actions[-10:]:  # Last 10 actions for context
+        for action in actions[-20:]:  # Last 20 actions for context
             action_history.append({
                 "action": action.action,
                 "sender": action.email.get('sender', ''),
                 "subject": action.email.get('subject', ''),
                 "location": action.context.get('location', 'unknown'),
-                "timestamp": action.timestamp.isoformat()
+                "timestamp": action.timestamp.isoformat(),
+                "labels": action.email.get('labels', []),
+                "is_read": action.email.get('is_read', False)
             })
         
         current_action_data = {
             "action": current_action.action,
             "sender": current_action.email.get('sender', ''),
             "subject": current_action.email.get('subject', ''),
-            "location": current_action.context.get('location', 'unknown')
+            "location": current_action.context.get('location', 'unknown'),
+            "labels": current_action.email.get('labels', []),
+            "is_read": current_action.email.get('is_read', False)
         }
         
-        system_prompt = """
-You are an email automation assistant. Analyze user email actions to detect patterns and suggest automations.
+        # Prepare existing workflows to prevent duplicates
+        existing_workflow_summaries = []
+        for workflow in existing_workflows:
+            existing_workflow_summaries.append({
+                "description": workflow.get('description', ''),
+                "trigger_event": workflow.get('trigger_event', 'email_received')
+            })
+        
+        system_prompt = f"""
+You are an intelligent email automation assistant. Analyze user email actions to detect meaningful patterns and suggest practical automations.
+
+{get_python_api_documentation()}
+
+Your task:
+1. Analyze the user's recent actions to identify clear, actionable patterns
+2. Check if similar workflows already exist to avoid duplicates
+3. Only suggest automations with high confidence (0.8+) and clear user benefit
+4. Generate complete, executable Python workflow functions
 
 Return JSON with:
-- "should_suggest": boolean (true if pattern detected)
-- "description": string (user-friendly suggestion like "Auto-archive emails from this sender?")
-- "confidence": float 0-1
-- "reasoning": string (why this pattern was detected)
-- "hook_function": string (Python function code using email.archive(), email.delete(), etc.)
-- "pattern_type": string ("sender_based", "subject_based", "location_based", etc.)
+- "should_suggest": boolean (true only if strong pattern detected and no duplicate exists)
+- "description": string (clear, actionable suggestion like "Auto-archive newsletters from this sender?")
+- "confidence": float 0-1 (only suggest if 0.8+)
+- "reasoning": string (detailed explanation of detected pattern)
+- "hook_function": string (complete Python function with proper @hook decorator)
+- "pattern_type": string ("sender_based", "subject_based", "content_based", "time_based", etc.)
+- "trigger_event": string ("email_received", "email_opened", "email_closed", "before_action")
 
-Look for patterns like:
-- Same action on emails from same sender (3+ times)
-- Actions that differ by location (home vs detail page)
-- Subject-based patterns (newsletters, notifications)
-- Sequential action patterns
+
+Pattern detection criteria:
+- Sender-based: Same action on emails from same sender
+- Subject-based: Same action on emails with similar subjects (newsletters, notifications)
+- Content-based: Same action on emails with similar content patterns
+- Time-based: Actions that happen at specific times or days
+- Sequential: Multi-step action patterns
+- Location-based: Actions that vary by interface location
+
+Only suggest if:
+- Clear pattern detected in recent actions
+- No similar existing workflow
+- Clear user benefit
 """
         
         user_prompt = {
             "current_action": current_action_data,
             "recent_actions": action_history,
-            "context": "User just performed an action, analyze if automation should be suggested"
+            "existing_workflows": existing_workflow_summaries,
+            "analysis_request": "Analyze if the current action completes a pattern worthy of automation"
         }
         
         completion = client.chat.completions.create(
@@ -218,25 +568,21 @@ Look for patterns like:
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": json.dumps(user_prompt)}
+                {"role": "user", "content": json.dumps(user_prompt, indent=2)}
             ],
-            temperature=0.3
+            temperature=0.2  # Lower temperature for more consistent analysis
         )
         
         result = json.loads(completion.choices[0].message.content)
         
-        if result.get("should_suggest", False):
+        if result.get("should_suggest", False) and result.get("confidence", 0) >= 0.8:
             suggestion = WorkflowSuggestion(
                 id=str(uuid.uuid4()),
                 description=result.get("description", "Automation suggestion"),
-                confidence=result.get("confidence", 0.5),
+                confidence=result.get("confidence", 0.8),
                 reasoning=result.get("reasoning", "Pattern detected"),
                 generated_function=result.get("hook_function", ""),
-                pattern_data={
-                    "pattern_type": result.get("pattern_type", "unknown"),
-                    "current_action": current_action_data,
-                    "analysis_result": result
-                },
+                trigger_event=result.get("trigger_event", "email_received"),
                 created_at=datetime.now()
             )
             
@@ -245,42 +591,6 @@ Look for patterns like:
             
     except Exception as e:
         print(f"LLM analysis failed: {e}")
-        return await analyze_action_patterns_fallback(user_id, current_action)
-    
-    return None
-
-async def analyze_action_patterns_fallback(user_id: str, current_action: UserAction):
-    actions = get_user_actions(user_id, limit=50)
-    
-    # Simple pattern: same action on emails from same sender
-    same_sender_actions = [
-        a for a in actions 
-        if a.email.get('sender') == current_action.email.get('sender')
-        and a.action == current_action.action
-    ]
-    
-    if len(same_sender_actions) >= 3:  # Including current action
-        suggestion = WorkflowSuggestion(
-            id=str(uuid.uuid4()),
-            description=f"Auto-{current_action.action.value} emails from {current_action.email.get('sender', 'this sender')}?",
-            confidence=0.8,
-            reasoning=f"You've {current_action.action.value}d {len(same_sender_actions)} emails from this sender",
-            generated_function=f"""
-@hook("email_received")
-async def auto_{current_action.action.value}_{current_action.email.get('sender', 'sender').replace('@', '_at_').replace('.', '_')}(email: Email, context: Context):
-    if email.sender == "{current_action.email.get('sender')}":
-        await email.{current_action.action.value}()
-""",
-            pattern_data={
-                "sender": current_action.email.get('sender'),
-                "action": current_action.action.value,
-                "occurrences": len(same_sender_actions)
-            },
-            created_at=datetime.now()
-        )
-        
-        suggestions_cache[suggestion.id] = suggestion
-        return suggestion
     
     return None
 
@@ -291,15 +601,131 @@ def store_accepted_suggestion(user_id: str, suggestion: WorkflowSuggestion):
     
     hook = {
         "id": str(uuid.uuid4()),
-        "name": f"auto_{suggestion.pattern_data.get('action', 'action')}_{len(hook_functions[user_id])}",
+        "name": f"auto_workflow_{len(hook_functions[user_id])}",
         "description": suggestion.description,
         "function_code": suggestion.generated_function,
+        "trigger_event": suggestion.trigger_event,
         "enabled": True,
         "created_at": datetime.now(),
-        "pattern_data": suggestion.pattern_data
+        "execution_count": 0,
+        "last_executed": None
     }
     
     hook_functions[user_id].append(hook)
+    return hook
+
+async def execute_workflow_hooks(user_id: str, trigger_event: str, email_data: Dict[str, Any], context_data: Dict[str, Any]):
+    """Execute all enabled workflow hooks for a given trigger event"""
+    if user_id not in hook_functions:
+        return []
+    
+    executed_workflows = []
+    
+    for hook in hook_functions[user_id]:
+        if not hook.get('enabled', True):
+            continue
+            
+        if hook.get('trigger_event', 'email_received') != trigger_event:
+            continue
+            
+        try:
+            # Execute the workflow hook
+            result = await execute_single_workflow(hook, email_data, context_data)
+            if result:
+                # Update execution stats
+                hook['execution_count'] = hook.get('execution_count', 0) + 1
+                hook['last_executed'] = datetime.now()
+                
+                executed_workflows.append({
+                    'hook_id': hook['id'],
+                    'description': hook['description'],
+                    'result': result,
+                    'executed_at': datetime.now()
+                })
+                
+                # Send notification to user
+                await manager.send_workflow_notification(user_id, {
+                    'type': 'workflow_executed',
+                    'hook_id': hook['id'],
+                    'description': hook['description'],
+                    'result': result,
+                    'can_undo': True  # Stub for future undo functionality
+                })
+                
+        except Exception as e:
+            print(f"Error executing workflow {hook['id']}: {e}")
+            # Send error notification
+            await manager.send_workflow_notification(user_id, {
+                'type': 'workflow_error',
+                'hook_id': hook['id'],
+                'description': hook['description'],
+                'error': str(e)
+            })
+    
+    return executed_workflows
+
+async def execute_single_workflow(hook: Dict[str, Any], email_data: Dict[str, Any], context_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Execute a single workflow function using real Python code execution"""
+    try:
+        # Create runtime objects
+        email = Email(email_data)
+        context = Context(context_data)
+        
+        # Get the generated function code
+        function_code = hook.get('function_code', '')
+        if not function_code:
+            return None
+        
+        # Create execution namespace with available objects
+        namespace = {
+            'email': email,
+            'context': context,
+            'llm': llm,
+            'hook': lambda event_type: lambda func: func,  # Decorator that just returns the function
+            'Email': Email,
+            'Context': Context,
+            'datetime': datetime,
+            'asyncio': asyncio
+        }
+        
+        # Execute the function code to define it
+        exec(function_code, namespace)
+        
+        # Find the workflow function (should be the only async function defined)
+        workflow_func = None
+        for name, obj in namespace.items():
+            if (callable(obj) and 
+                not name.startswith('_') and 
+                name not in ['email', 'context', 'llm', 'hook', 'Email', 'Context', 'datetime', 'asyncio'] and
+                inspect.iscoroutinefunction(obj)):
+                workflow_func = obj
+                break
+        
+        if workflow_func is None:
+            print(f"No workflow function found in generated code")
+            return None
+        
+        # Execute the workflow function
+        result = await workflow_func(email, context)
+        
+        # Return execution results
+        execution_result = {
+            'function_executed': workflow_func.__name__,
+            'actions_taken': email._actions_taken,
+            'result': result,
+            'email_id': email.id
+        }
+        
+        return execution_result
+        
+    except Exception as e:
+        print(f"Error executing workflow function: {e}")
+        print(f"Function code was: {hook.get('function_code', 'N/A')}")
+        return {
+            'error': str(e),
+            'function_code': hook.get('function_code', ''),
+            'email_id': email_data.get('id', 'unknown')
+        }
 
 # WebSocket Endpoint
 @router.websocket("/ws/{user_id}/{session_id}")
@@ -324,12 +750,17 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 
                 print(f"Stored action {action_id}: {action.action} on email from {action.email.get('sender')}")
                 
-                # Check if we should analyze for patterns
+                # Check if we should analyze for patterns with debouncing
                 if should_analyze_for_patterns(user_id, action):
-                    suggestion = await analyze_action_patterns_with_llm(user_id, action)
-                    if suggestion:
-                        print(f"Generated suggestion: {suggestion.description}")
-                        await manager.send_suggestion(user_id, suggestion)
+                    # Cancel any existing analysis task for this user
+                    if user_id in pending_analysis_tasks:
+                        pending_analysis_tasks[user_id].cancel()
+                        print(f"🚫 Cancelled previous analysis task for user {user_id}")
+                    
+                    # Start new debounced analysis task
+                    print(f"⏱️ Scheduling debounced LLM analysis for user {user_id}...")
+                    task = asyncio.create_task(debounced_analyze_patterns(user_id, action))
+                    pending_analysis_tasks[user_id] = task
             
             elif message["type"] == "suggestion_response":
                 # Handle user's response to suggestion
@@ -339,13 +770,18 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 
                 if accepted and suggestion_id in suggestions_cache:
                     suggestion = suggestions_cache[suggestion_id]
-                    store_accepted_suggestion(user_id, suggestion)
-                    print(f"Stored hook function for user {user_id}")
+                    hook = store_accepted_suggestion(user_id, suggestion)
+                    print(f"Stored hook function {hook['id']} for user {user_id}")
                     
-                    # Send confirmation
+                    # Send confirmation with hook details
                     confirmation = {
                         "type": "suggestion_accepted",
-                        "data": {"message": "Automation rule created!"}
+                        "data": {
+                            "message": "Automation rule created!",
+                            "hook_id": hook['id'],
+                            "description": hook['description'],
+                            "trigger_event": hook['trigger_event']
+                        }
                     }
                     
                     connection_key = f"{user_id}:{session_id}"
@@ -357,6 +793,21 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 # Clean up suggestion from cache
                 if suggestion_id in suggestions_cache:
                     del suggestions_cache[suggestion_id]
+            
+            elif message["type"] == "email_event":
+                # Handle email events that might trigger workflows
+                event_data = message["data"]
+                trigger_event = event_data.get("event_type", "email_received")
+                email_data = event_data.get("email", {})
+                context_data = event_data.get("context", {})
+                
+                # Execute any matching workflow hooks
+                executed_workflows = await execute_workflow_hooks(
+                    user_id, trigger_event, email_data, context_data
+                )
+                
+                if executed_workflows:
+                    print(f"Executed {len(executed_workflows)} workflows for user {user_id}")
     
     except WebSocketDisconnect:
         manager.disconnect(user_id, session_id)
@@ -366,22 +817,60 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         manager.disconnect(user_id, session_id)
 
 # REST Endpoints for debugging/management
-@router.get("/api/actions/{user_id}")
+@router.get("/actions/{user_id}")
 async def get_actions(user_id: str):
     """Get user's action history"""
-    return get_user_actions(user_id, 50)
+    actions = get_user_actions(user_id, limit=50)
+    return {"actions": [action.dict() for action in actions]}
 
-@router.get("/api/hooks/{user_id}")
+@router.get("/hooks/{user_id}")
 async def get_hooks(user_id: str):
     """Get user's hook functions"""
-    return hook_functions.get(user_id, [])
+    return {"hooks": hook_functions.get(user_id, [])}
 
-@router.get("/api/stats")
+@router.post("/hooks/{user_id}/{hook_id}/toggle")
+async def toggle_hook(user_id: str, hook_id: str):
+    """Enable/disable a specific hook"""
+    if user_id not in hook_functions:
+        return {"error": "User not found"}
+    
+    for hook in hook_functions[user_id]:
+        if hook['id'] == hook_id:
+            hook['enabled'] = not hook.get('enabled', True)
+            return {
+                "success": True,
+                "hook_id": hook_id,
+                "enabled": hook['enabled']
+            }
+    
+    return {"error": "Hook not found"}
+
+@router.delete("/hooks/{user_id}/{hook_id}")
+async def delete_hook(user_id: str, hook_id: str):
+    """Delete a specific hook"""
+    if user_id not in hook_functions:
+        return {"error": "User not found"}
+    
+    hook_functions[user_id] = [
+        hook for hook in hook_functions[user_id]
+        if hook['id'] != hook_id
+    ]
+    
+    return {"success": True, "deleted_hook_id": hook_id}
+
+@router.get("/stats")
 async def get_stats():
     """Get system stats"""
+    total_executions = sum(
+        sum(hook.get('execution_count', 0) for hook in hooks)
+        for hooks in hook_functions.values()
+    )
+    
     return {
         "total_users": len(action_logs),
         "total_actions": sum(len(actions) for actions in action_logs.values()),
         "total_hooks": sum(len(hooks) for hooks in hook_functions.values()),
-        "active_connections": len(manager.active_connections)
+        "total_executions": total_executions,
+        "active_connections": len(manager.active_connections),
+        "suggestions_pending": len(suggestions_cache)
     }

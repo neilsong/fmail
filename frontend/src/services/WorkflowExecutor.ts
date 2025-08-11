@@ -357,15 +357,21 @@ export class WorkflowExecutor {
       const originalUtils = (globalThis as any).utils;
       const originalConsole = (globalThis as any).console;
 
-      // Store reference to original console.log to avoid circular reference
+      // Store references to original console methods to avoid circular reference
       const originalConsoleLog = console.log;
+      const originalConsoleError = console.error;
+      const originalConsoleWarn = console.warn;
+      const originalConsoleInfo = console.info;
 
       // Inject workflow APIs into global scope
       (globalThis as any).email = emailAPI;
       (globalThis as any).context = contextAPI;
       (globalThis as any).utils = workflowUtils;
       (globalThis as any).console = {
-        log: (...args: any[]) => originalConsoleLog(`[Workflow ${hook.id}]`, ...args)
+        log: (...args: any[]) => originalConsoleLog(`[Workflow ${hook.id}]`, ...args),
+        error: (...args: any[]) => originalConsoleError(`[Workflow ${hook.id}] ERROR:`, ...args),
+        warn: (...args: any[]) => originalConsoleWarn(`[Workflow ${hook.id}] WARN:`, ...args),
+        info: (...args: any[]) => originalConsoleInfo(`[Workflow ${hook.id}] INFO:`, ...args)
       };
 
       try {
@@ -377,13 +383,26 @@ export class WorkflowExecutor {
         
         // Execute the workflow function code using eval
         try {
-          eval(hook.function_code);
+          // Handle different function formats from LLM
+          let executableCode = hook.function_code.trim();
+          
+          // If it's an anonymous function statement, wrap it to make it executable
+          if (executableCode.startsWith('function(') && !executableCode.includes('=')) {
+            // Convert "function() { ... }" to "(function() { ... })()"
+            executableCode = `(${executableCode})()`;
+            console.log(`[DEBUG] Wrapped anonymous function for execution: ${executableCode}`);
+          }
+          // If it's already a function expression or IIFE, use as-is
+          // If it's regular code (not a function), use as-is
+          
+          eval(executableCode);
         } catch (evalError) {
           console.error(`[DEBUG] Eval error in workflow ${hook.id}:`, evalError);
           console.error(`[DEBUG] Error type:`, evalError.constructor.name);
           console.error(`[DEBUG] Error message:`, evalError.message);
           if (evalError instanceof SyntaxError) {
             console.error(`[DEBUG] Syntax error details - this usually means invalid JavaScript code`);
+            console.error(`[DEBUG] Original code:`, hook.function_code);
           }
           throw evalError;
         }

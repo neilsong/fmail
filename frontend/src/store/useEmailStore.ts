@@ -117,7 +117,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     });
     
     console.log(`Adding ${newEmails.length} new emails (filtered out ${emails.length - newEmails.length} duplicates)`);
-    return { emails: [...state.emails, ...newEmails] };
+    return { emails: [...newEmails, ...state.emails] };
   }),
 
   removeDuplicates: () => set((state) => {

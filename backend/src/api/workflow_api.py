@@ -86,73 +86,6 @@ user_workflows: Dict[str, List[Dict]] = {}  # user_id -> current workflows for L
 pending_analysis_tasks: Dict[str, asyncio.Task] = {}  # user_id -> analysis task
 analysis_debounce_delay = 1.0  # 1 second debounce delay
 
-# Runtime classes for workflow execution
-class Email:
-    """Email object available in workflow functions"""
-    def __init__(self, email_data: Dict[str, Any]):
-        self.id = email_data.get('id', '')
-        self.sender = email_data.get('sender', '')
-        self.subject = email_data.get('subject', '')
-        self.body = email_data.get('body', '')
-        self.labels = email_data.get('labels', [])
-        self.is_read = email_data.get('is_read', False)
-        self.is_starred = email_data.get('is_starred', False)
-        self.received_at = email_data.get('received_at', datetime.now())
-        self.attachments = email_data.get('attachments', [])
-        self._actions_taken = []  # Track actions for result reporting
-    
-    async def archive(self):
-        """Archive this email"""
-        self._actions_taken.append({'action': 'archive', 'timestamp': datetime.now()})
-        return {'action': 'archive', 'email_id': self.id}
-    
-    async def delete(self):
-        """Delete this email"""
-        self._actions_taken.append({'action': 'delete', 'timestamp': datetime.now()})
-        return {'action': 'delete', 'email_id': self.id}
-    
-    async def mark_read(self):
-        """Mark email as read"""
-        self.is_read = True
-        self._actions_taken.append({'action': 'mark_read', 'timestamp': datetime.now()})
-        return {'action': 'mark_read', 'email_id': self.id}
-    
-    async def mark_unread(self):
-        """Mark email as unread"""
-        self.is_read = False
-        self._actions_taken.append({'action': 'mark_unread', 'timestamp': datetime.now()})
-        return {'action': 'mark_unread', 'email_id': self.id}
-    
-    async def star(self):
-        """Star this email"""
-        self.is_starred = True
-        self._actions_taken.append({'action': 'star', 'timestamp': datetime.now()})
-        return {'action': 'star', 'email_id': self.id}
-    
-    async def unstar(self):
-        """Unstar this email"""
-        self.is_starred = False
-        self._actions_taken.append({'action': 'unstar', 'timestamp': datetime.now()})
-        return {'action': 'unstar', 'email_id': self.id}
-    
-    async def add_label(self, label_name: str):
-        """Add label to email"""
-        if label_name not in self.labels:
-            self.labels.append(label_name)
-        self._actions_taken.append({'action': 'add_label', 'label': label_name, 'timestamp': datetime.now()})
-        return {'action': 'add_label', 'label': label_name, 'email_id': self.id}
-    
-    async def remove_label(self, label_name: str):
-        """Remove label from email"""
-        if label_name in self.labels:
-            self.labels.remove(label_name)
-        self._actions_taken.append({'action': 'remove_label', 'label': label_name, 'timestamp': datetime.now()})
-        return {'action': 'remove_label', 'label': label_name, 'email_id': self.id}
-    
-    async def move_to_folder(self, folder_name: str):
-        """Move email to folder"""
-        self._actions_taken.append({'action': 'move_to_folder', 'folder': folder_name, 'timestamp': datetime.now()})
-        return {'action': 'move_to_folder', 'folder': folder_name, 'email_id': self.id}
 
 class Context:
     """Context object available in workflow functions"""
@@ -380,76 +313,7 @@ def should_analyze_for_patterns(user_id: str, current_action: UserAction) -> boo
     print(f"=== END PATTERN CHECK ===\n")
     return True
 
-def get_python_api_documentation() -> str:
-    """Return comprehensive Python API documentation for LLM to generate workflows"""
-    return """
-# FMail Workflow API Documentation
-
-## Available Email Actions
-- `email.archive()` - Move email to archive
-- `email.delete()` - Move email to trash
-- `email.mark_read()` - Mark email as read
-- `email.mark_unread()` - Mark email as unread
-- `email.star()` - Add star to email
-- `email.unstar()` - Remove star from email
-- `email.add_label(label_name)` - Add label to email
-- `email.remove_label(label_name)` - Remove label from email
-- `email.move_to_folder(folder_name)` - Move to specific folder
-
-## Available Email Properties
-- `email.sender` - Sender email address
-- `email.subject` - Email subject line
-- `email.body` - Email body content
-- `email.labels` - List of current labels
-- `email.is_read` - Boolean read status
-- `email.is_starred` - Boolean starred status
-- `email.received_at` - Datetime when received
-- `email.attachments` - List of attachment info
-
-## Available Context Properties
-- `context.user_id` - Current user ID
-- `context.location` - Where action was triggered ('inbox', 'detail', etc.)
-- `context.time_of_day` - Time when action occurred
-- `context.day_of_week` - Day of week (0=Monday, 6=Sunday)
-
-## Hook Decorators
-- `@hook("email_received")` - Trigger when new email arrives
-- `@hook("email_opened")` - Trigger when email is opened
-- `@hook("email_closed")` - Trigger when email is closed
-- `@hook("before_action")` - Trigger before any user action
-
-## LLM Helper Functions (Available in workflows)
-- `llm.classify(text, categories)` - Classify text into categories
-- `llm.extract(text, schema)` - Extract structured data from text
-- `llm.decide(question, context)` - Make binary decisions
-- `llm.summarize(text, max_length)` - Summarize text content
-- `llm.match_pattern(text, patterns)` - Match against learned patterns
-
-## Example Workflow Functions
-```python
-@hook("email_received")
-async def auto_archive_newsletters(email: Email, context: Context):
-    classification = await llm.classify(email.subject, ["newsletter", "promotion", "regular"])
-    if classification == "newsletter":
-        await email.add_label("Newsletter")
-        await email.archive()
-        return {"action": "archived", "reason": "Detected newsletter"}
-
-@hook("email_received")
-async def auto_label_by_sender(email: Email, context: Context):
-    if email.sender.endswith("@company.com"):
-        await email.add_label("Work")
-        return {"action": "labeled", "label": "Work"}
-
-@hook("email_received")
-async def smart_spam_detection(email: Email, context: Context):
-    is_spam = await llm.decide("Is this spam?", f"Subject: {email.subject}, Sender: {email.sender}")
-    if is_spam:
-        await email.add_label("Spam")
-        await email.delete()
-        return {"action": "deleted", "reason": "Detected as spam"}
-```
-"""
+# NOTE: Python API documentation removed since workflow execution moved to JavaScript frontend
 
 async def debounced_analyze_patterns(user_id: str, current_action: UserAction) -> None:
     """Debounced wrapper for LLM analysis to prevent overwhelming the LLM with rapid requests"""
@@ -521,25 +385,70 @@ async def analyze_action_patterns_with_llm(user_id: str, current_action: UserAct
                 "trigger_event": workflow.get('trigger_event', 'email_received')
             })
         
-        system_prompt = f"""
+        system_prompt = """
 You are an intelligent email automation assistant. Analyze user email actions to detect meaningful patterns and suggest practical automations.
 
-{get_python_api_documentation()}
+CRITICAL: Generate JavaScript code blocks (NOT function declarations). The frontend executes JavaScript using eval().
+
+JavaScript Email API Available:
+- email.id - Email ID (string)
+- email.sender - Sender email address (string)  
+- email.subject - Email subject (string)
+- email.body - Email body content (string)
+- email.labels - Array of label strings
+- email.is_read - Boolean if email is read
+- email.is_starred - Boolean if email is starred
+- email.received_at - Date object when received
+
+JavaScript Actions Available:
+- email.archive() - Archive the email
+- email.delete() - Delete the email
+- email.star() - Star the email
+- email.unstar() - Remove star
+- email.markRead() - Mark as read
+- email.markUnread() - Mark as unread
+- email.addLabel(labelName) - Add a label
+- email.removeLabel(labelName) - Remove a label
+- email.moveToSpam() - Move to spam
+- email.moveToTrash() - Move to trash
+
+Context API Available:
+- context.user_id - User ID (string)
+- context.location - Where action occurred ('home', 'detail')
+- context.time_of_day - Hour of day (0-23)
+- context.day_of_week - Day of week (0-6, 0=Sunday)
+
+IMPORTANT: Generate JavaScript code blocks, NOT function declarations. Examples:
+
+CORRECT format for hook_function:
+```
+if (email.sender === 'newsletter@example.com') {
+  email.archive();
+  console.log('Auto-archived newsletter');
+}
+```
+
+WRONG format (DO NOT USE):
+```
+function() { ... }
+() => { ... }
+(function() { ... })
+```
 
 Your task:
 1. Analyze the user's recent actions to identify clear, actionable patterns
 2. Check if similar workflows already exist to avoid duplicates
 3. Only suggest automations with high confidence (0.8+) and clear user benefit
-4. Generate complete, executable Python workflow functions
+4. Generate executable JavaScript code blocks (NOT function declarations)
 
 Return JSON with:
 - "should_suggest": boolean (true only if strong pattern detected and no duplicate exists)
 - "description": string (clear, actionable suggestion like "Auto-archive newsletters from this sender?")
 - "confidence": float 0-1 (only suggest if 0.8+)
 - "reasoning": string (detailed explanation of detected pattern)
-- "hook_function": string (complete Python function with proper @hook decorator)
+- "hook_function": string (JavaScript code block - NO function wrapper, just the code)
 - "pattern_type": string ("sender_based", "subject_based", "content_based", "time_based", etc.)
-- "trigger_event": string ("email_received", "email_opened", "email_closed", "before_action")
+- "trigger_event": string ("email_received", "email_closed", "user_action")
 
 
 Pattern detection criteria:

@@ -46,16 +46,28 @@ class EmailSimulator {
         loadHillaryReceivedEmails()
       ]);
 
-      // Combine and sort by time (newest first for realistic inbox behavior)
-      const allEmails = [...sentEmails, ...receivedEmails].sort((a, b) => 
+      // Prioritize received emails (inbox) for simulation, then add sent emails
+      // This ensures users see emails in their inbox, not just sent folder
+      const inboxEmails = receivedEmails.filter(email => email.location === 'inbox');
+      const otherEmails = [...sentEmails, ...receivedEmails.filter(email => email.location !== 'inbox')];
+      
+      // Combine with inbox emails first, then others, sorted by time (newest first)
+      const allEmails = [...inboxEmails, ...otherEmails].sort((a, b) => 
         new Date(b.time).getTime() - new Date(a.time).getTime()
       );
 
+      console.log(`📊 EmailSimulator: ${inboxEmails.length} inbox emails, ${otherEmails.length} other emails`);
+
       console.log(`📊 EmailSimulator: Loaded ${allEmails.length} total emails`);
 
-      // Split emails: first 200 for initial load, rest for simulation
-      const initialEmails = allEmails.slice(0, this.INITIAL_EMAIL_COUNT);
-      this.pendingEmails = allEmails.slice(this.INITIAL_EMAIL_COUNT);
+      // Split emails: last 200 for initial load, first (newest) for simulation
+      // This ensures simulated emails are newer than initial emails
+      const totalEmails = allEmails.length;
+      const simulationCount = Math.min(totalEmails, this.INITIAL_EMAIL_COUNT);
+      
+      // Take newest emails for simulation, older emails for initial load
+      this.pendingEmails = allEmails.slice(0, simulationCount).reverse(); // Reverse to simulate oldest-to-newest
+      const initialEmails = allEmails.slice(simulationCount);
 
       console.log(`📥 EmailSimulator: ${initialEmails.length} emails for initial load`);
       console.log(`⏳ EmailSimulator: ${this.pendingEmails.length} emails pending for simulation`);

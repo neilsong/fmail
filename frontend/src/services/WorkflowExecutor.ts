@@ -1,5 +1,6 @@
 import type { UserAction } from "@/WorkflowTracker";
 import type { Email } from "@/store/email.schema";
+import { useEmailStore } from "@/store/useEmailStore";
 
 // Types for workflow system
 // Note: Using the Zod schema Email type directly
@@ -65,37 +66,65 @@ class WorkflowEmailAPI {
   archive(): void {
     this.actionsTaken.push('archive');
     console.log(`[Workflow] Archive email ${this.email.id}`);
+    
+    // Actually execute the archive action on the email store
+    const emailStore = useEmailStore.getState();
+    emailStore.moveEmail(this.email.id, 'archive');
   }
 
   delete(): void {
     this.actionsTaken.push('delete');
     console.log(`[Workflow] Delete email ${this.email.id}`);
+    
+    // Actually execute the delete action on the email store
+    const emailStore = useEmailStore.getState();
+    emailStore.deleteEmail(this.email.id);
   }
 
   star(): void {
     this.actionsTaken.push('star');
     console.log(`[Workflow] Star email ${this.email.id}`);
+    
+    // Actually execute the star action on the email store
+    const emailStore = useEmailStore.getState();
+    emailStore.toggleStarred(this.email.id);
   }
 
   unstar(): void {
     this.actionsTaken.push('unstar');
     console.log(`[Workflow] Unstar email ${this.email.id}`);
+    
+    // Actually execute the unstar action on the email store
+    const emailStore = useEmailStore.getState();
+    emailStore.toggleStarred(this.email.id);
   }
 
   markRead(): void {
     this.actionsTaken.push('mark_read');
     console.log(`[Workflow] Mark read email ${this.email.id}`);
+    
+    // Actually execute the mark read action on the email store
+    const emailStore = useEmailStore.getState();
+    emailStore.markAsRead(this.email.id, true);
   }
 
   markUnread(): void {
     this.actionsTaken.push('mark_unread');
     console.log(`[Workflow] Mark unread email ${this.email.id}`);
+    
+    // Actually execute the mark unread action on the email store
+    const emailStore = useEmailStore.getState();
+    emailStore.markAsRead(this.email.id, false);
   }
 
   addLabel(label: string): void {
     if (label && typeof label === 'string') {
       this.actionsTaken.push(`add_label:${label}`);
       console.log(`[Workflow] Add label "${label}" to email ${this.email.id}`);
+      
+      // Actually execute the add label action on the email store
+      const emailStore = useEmailStore.getState();
+      emailStore.addTag(this.email.id, label as any);
     }
   }
 
@@ -103,17 +132,29 @@ class WorkflowEmailAPI {
     if (label && typeof label === 'string') {
       this.actionsTaken.push(`remove_label:${label}`);
       console.log(`[Workflow] Remove label "${label}" from email ${this.email.id}`);
+      
+      // Actually execute the remove label action on the email store
+      const emailStore = useEmailStore.getState();
+      emailStore.removeTag(this.email.id, label as any);
     }
   }
 
   moveToSpam(): void {
     this.actionsTaken.push('move_to_spam');
     console.log(`[Workflow] Move email ${this.email.id} to spam`);
+    
+    // Actually execute the move to spam action on the email store
+    const emailStore = useEmailStore.getState();
+    emailStore.moveEmail(this.email.id, 'spam');
   }
 
   moveToTrash(): void {
     this.actionsTaken.push('move_to_trash');
     console.log(`[Workflow] Move email ${this.email.id} to trash`);
+    
+    // Actually execute the move to trash action on the email store
+    const emailStore = useEmailStore.getState();
+    emailStore.moveEmail(this.email.id, 'trash');
   }
 
   getActionsTaken(): string[] {
@@ -233,9 +274,16 @@ export class WorkflowExecutor {
 
   // Get enabled hooks for a specific trigger
   getHooksForTrigger(trigger: string): WorkflowHook[] {
-    return this.hooks.filter(hook => 
-      hook.enabled && hook.trigger_event === trigger
-    );
+    const allHooks = this.hooks;
+    const enabledHooks = allHooks.filter(hook => hook.enabled);
+    const triggerHooks = enabledHooks.filter(hook => hook.trigger_event === trigger);
+    
+    console.log(`[WorkflowExecutor] Total hooks: ${allHooks.length}, Enabled: ${enabledHooks.length}, For trigger '${trigger}': ${triggerHooks.length}`);
+    if (allHooks.length > 0) {
+      console.log(`[WorkflowExecutor] All hooks:`, allHooks.map(h => ({ name: h.name, enabled: h.enabled, trigger: h.trigger_event })));
+    }
+    
+    return triggerHooks;
   }
 
   // Enable/disable a hook
@@ -265,9 +313,18 @@ export class WorkflowExecutor {
     const hooks = this.getHooksForTrigger('email_received');
     const results: WorkflowResult[] = [];
 
+    console.log(`[WorkflowExecutor] Processing email from ${email.from} with subject "${email.subject}"`);
+    console.log(`[WorkflowExecutor] Found ${hooks.length} enabled workflows for email_received trigger`);
+
     for (const hook of hooks) {
+      console.log(`[WorkflowExecutor] Executing workflow: ${hook.name} (${hook.id})`);
       const result = await this.executeHook(hook, email, context);
       results.push(result);
+      
+      console.log(`[WorkflowExecutor] Workflow ${hook.name} result: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+      if (result.actions_taken.length > 0) {
+        console.log(`[WorkflowExecutor] Actions taken: ${result.actions_taken.join(', ')}`);
+      }
       
       // Update execution stats if successful
       if (result.success) {

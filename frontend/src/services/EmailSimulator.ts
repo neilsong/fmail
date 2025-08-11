@@ -1,7 +1,7 @@
-import { useEmailStore } from "@/store/useEmailStore";
-import { workflowService } from "@/services/WorkflowService";
 import { loadHillaryEmails, loadHillaryReceivedEmails } from "@/data/hillaryEmailLoader";
+import { workflowService } from "@/services/WorkflowService";
 import type { Email } from "@/store/email.schema";
+import { useEmailStore } from "@/store/useEmailStore";
 
 /**
  * Email simulation service that manages incoming email simulation
@@ -43,20 +43,25 @@ class EmailSimulator {
       // Load all available emails from both sources
       const [sentEmails, receivedEmails] = await Promise.all([
         loadHillaryEmails(),
-        loadHillaryReceivedEmails()
+        loadHillaryReceivedEmails(),
       ]);
 
       // Prioritize received emails (inbox) for simulation, then add sent emails
       // This ensures users see emails in their inbox, not just sent folder
-      const inboxEmails = receivedEmails.filter(email => email.location === 'inbox');
-      const otherEmails = [...sentEmails, ...receivedEmails.filter(email => email.location !== 'inbox')];
-      
+      const inboxEmails = receivedEmails.filter((email) => email.location === "inbox");
+      const otherEmails = [
+        ...sentEmails,
+        ...receivedEmails.filter((email) => email.location !== "inbox"),
+      ];
+
       // Combine with inbox emails first, then others, sorted by time (newest first)
-      const allEmails = [...inboxEmails, ...otherEmails].sort((a, b) => 
-        new Date(b.time).getTime() - new Date(a.time).getTime()
+      const allEmails = [...inboxEmails, ...otherEmails].sort(
+        (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
       );
 
-      console.log(`📊 EmailSimulator: ${inboxEmails.length} inbox emails, ${otherEmails.length} other emails`);
+      console.log(
+        `📊 EmailSimulator: ${inboxEmails.length} inbox emails, ${otherEmails.length} other emails`
+      );
 
       console.log(`📊 EmailSimulator: Loaded ${allEmails.length} total emails`);
 
@@ -64,13 +69,18 @@ class EmailSimulator {
       // This ensures simulated emails are newer than initial emails
       const totalEmails = allEmails.length;
       const simulationCount = Math.min(totalEmails, this.INITIAL_EMAIL_COUNT);
-      
+
       // Take newest emails for simulation, older emails for initial load
-      this.pendingEmails = allEmails.slice(0, simulationCount).reverse(); // Reverse to simulate oldest-to-newest
+      this.pendingEmails = allEmails
+        .filter((email) => email.location === "inbox")
+        .slice(0, simulationCount)
+        .reverse(); // Reverse to simulate oldest-to-newest
       const initialEmails = allEmails.slice(simulationCount);
 
       console.log(`📥 EmailSimulator: ${initialEmails.length} emails for initial load`);
-      console.log(`⏳ EmailSimulator: ${this.pendingEmails.length} emails pending for simulation`);
+      console.log(
+        `⏳ EmailSimulator: ${this.pendingEmails.length} emails pending for simulation`
+      );
 
       // Set initial emails in the store
       const emailStore = useEmailStore.getState();
@@ -78,7 +88,6 @@ class EmailSimulator {
 
       this.isInitialized = true;
       console.log("✅ EmailSimulator: Initialization complete");
-
     } catch (error) {
       console.error("❌ EmailSimulator: Failed to initialize:", error);
       throw error;
@@ -146,8 +155,11 @@ class EmailSimulator {
     }
 
     // Get the next email from pending list
-    const newEmail = this.pendingEmails.shift()!;
-    
+    const newEmail = {
+      ...this.pendingEmails.shift()!,
+      time: new Date().toLocaleString(),
+    };
+
     console.log(`📨 EmailSimulator: Simulating new email from ${newEmail.from}`);
     console.log(`   Subject: ${newEmail.subject}`);
 
@@ -159,13 +171,20 @@ class EmailSimulator {
     try {
       const results = await workflowService.handleIncomingEmail(newEmail);
       if (results.length > 0) {
-        console.log(`🔧 EmailSimulator: Executed ${results.length} workflows for new email`);
+        console.log(
+          `🔧 EmailSimulator: Executed ${results.length} workflows for new email`
+        );
       }
     } catch (error) {
-      console.error("❌ EmailSimulator: Error processing workflows for new email:", error);
+      console.error(
+        "❌ EmailSimulator: Error processing workflows for new email:",
+        error
+      );
     }
 
-    console.log(`📊 EmailSimulator: ${this.pendingEmails.length} emails remaining in queue`);
+    console.log(
+      `📊 EmailSimulator: ${this.pendingEmails.length} emails remaining in queue`
+    );
   }
 
   /**
@@ -182,7 +201,7 @@ class EmailSimulator {
       isInitialized: this.isInitialized,
       isRunning: this.simulationInterval !== null,
       pendingCount: this.pendingEmails.length,
-      totalProcessed: emailStore.emails.length
+      totalProcessed: emailStore.emails.length,
     };
   }
 
